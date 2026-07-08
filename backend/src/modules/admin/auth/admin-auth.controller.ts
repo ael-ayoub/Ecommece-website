@@ -52,6 +52,10 @@ export const adminAuthController = {
     return reply.send({ message: "Token refreshed" });
   },
 
+  async me(request: FastifyRequest, reply: FastifyReply) {
+    return reply.send({ admin: request.admin });
+  },
+
   async logout(request: FastifyRequest, reply: FastifyReply) {
     const refreshToken = request.cookies[ADMIN_REFRESH_COOKIE];
     await adminAuthService.logout(refreshToken);

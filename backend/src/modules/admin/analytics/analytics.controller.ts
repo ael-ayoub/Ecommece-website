@@ -18,4 +18,14 @@ export const adminAnalyticsController = {
     const result = await adminAnalyticsService.returns();
     return reply.send(result);
   },
+
+  async salesByDay(_request: FastifyRequest, reply: FastifyReply) {
+    const result = await adminAnalyticsService.salesByDay(7);
+    return reply.send(result);
+  },
+
+  async inventoryHealth(_request: FastifyRequest, reply: FastifyReply) {
+    const result = await adminAnalyticsService.inventoryHealth();
+    return reply.send(result);
+  },
 };

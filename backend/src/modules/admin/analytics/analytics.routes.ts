@@ -9,4 +9,6 @@ export async function adminAnalyticsRoutes(app: FastifyInstance) {
   app.get("/summary", { schema: { tags: ["admin-analytics"] } }, adminAnalyticsController.summary);
   app.get("/profit", { schema: { querystring: dateRangeQuerySchema, tags: ["admin-analytics"] } }, adminAnalyticsController.profit);
   app.get("/returns", { schema: { tags: ["admin-analytics"] } }, adminAnalyticsController.returns);
+  app.get("/sales-by-day", { schema: { tags: ["admin-analytics"] } }, adminAnalyticsController.salesByDay);
+  app.get("/inventory-health", { schema: { tags: ["admin-analytics"] } }, adminAnalyticsController.inventoryHealth);
 }

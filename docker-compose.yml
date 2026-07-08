@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:16-alpine
+    container_name: postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-ecommerce}
@@ -18,6 +19,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    container_name: redis
     restart: unless-stopped
     volumes:
       - redis_data:/data
@@ -33,6 +35,7 @@ services:
   # Web UI at http://localhost:8025
   mailhog:
     image: mailhog/mailhog:v1.0.1
+    container_name: mailhog
     restart: unless-stopped
     ports:
       - "127.0.0.1:8025:8025"
@@ -42,6 +45,7 @@ services:
   backend:
     build:
       context: ./backend
+    container_name: backend
     restart: unless-stopped
     environment:
       NODE_ENV: ${NODE_ENV:-production}
@@ -77,6 +81,7 @@ services:
   frontend:
     build:
       context: ./frontend
+    container_name: frontend
     restart: unless-stopped
     environment:
       NODE_ENV: ${NODE_ENV:-production}
@@ -86,8 +91,20 @@ services:
     expose:
       - "4321"
 
+  # Admin panel SPA — served at /admin/* (Caddy strips the prefix before forwarding here).
+  admin:
+    build:
+      context: ./admin
+    container_name: admin
+    restart: unless-stopped
+    depends_on:
+      - backend
+    expose:
+      - "4322"
+
   caddy:
     image: caddy:2-alpine
+    container_name: caddy
     restart: unless-stopped
     ports:
       - "80:80"
@@ -98,6 +115,7 @@ services:
       - caddy_config:/config
     depends_on:
       - frontend
+      - admin
       - backend
 
 volumes:

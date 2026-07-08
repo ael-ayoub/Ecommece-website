@@ -5,6 +5,13 @@
 		reverse_proxy backend:3000
 	}
 
+	# Admin SPA lives at /admin/* — strip the prefix before forwarding, since the
+	# admin app itself is built and served as if it were at the root (see admin/vite.config.ts,
+	# which sets base: "/admin/" so the browser still requests /admin/assets/... correctly).
+	handle_path /admin/* {
+		reverse_proxy admin:4322
+	}
+
 	handle {
 		reverse_proxy frontend:4321
 	}

@@ -22,7 +22,7 @@ export const adminOrdersRepository = {
     const [items, total] = await Promise.all([
       prisma.order.findMany({
         where,
-        include: { items: true },
+        include: { items: true, user: { select: { full_name: true, email: true } } },
         orderBy: { created_at: "desc" },
         skip: (filter.page - 1) * filter.pageSize,
         take: filter.pageSize,
@@ -34,6 +34,9 @@ export const adminOrdersRepository = {
   },
 
   findById(id: string) {
-    return prisma.order.findUnique({ where: { id }, include: { items: true } });
+    return prisma.order.findUnique({
+      where: { id },
+      include: { items: true, user: { select: { full_name: true, email: true } } },
+    });
   },
 };

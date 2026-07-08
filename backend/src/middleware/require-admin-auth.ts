@@ -21,7 +21,7 @@ export async function requireAdminAuth(request: FastifyRequest, _reply: FastifyR
     throw new UnauthorizedError("Admin account is disabled or no longer exists");
   }
 
-  request.admin = { id: admin.id, role: admin.role };
+  request.admin = { id: admin.id, email: admin.email, role: admin.role };
 }
 
 export function requireAdminRole(...roles: Array<"SUPER_ADMIN" | "STAFF">) {

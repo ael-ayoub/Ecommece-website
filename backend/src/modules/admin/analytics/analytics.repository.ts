@@ -43,4 +43,22 @@ export const adminAnalyticsRepository = {
     ]);
     return { pending, completed };
   },
+
+  async ordersSince(since: Date) {
+    return prisma.order.findMany({
+      where: { ...NOT_CANCELLED, created_at: { gte: since } },
+      select: { created_at: true, total_amount: true, delivery_cost: true },
+    });
+  },
+
+  async inventoryHealth(lowStockThreshold: number) {
+    const products = await prisma.product.findMany({
+      where: { is_deleted: false, is_enabled: true },
+      select: { stock_display: true },
+    });
+    const inStockUnits = products.filter((p) => p.stock_display > 0).reduce((sum, p) => sum + p.stock_display, 0);
+    const outOfStockCount = products.filter((p) => p.stock_display === 0).length;
+    const lowStockCount = products.filter((p) => p.stock_display > 0 && p.stock_display <= lowStockThreshold).length;
+    return { inStockUnits, outOfStockCount, lowStockCount };
+  },
 };

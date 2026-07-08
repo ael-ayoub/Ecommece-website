@@ -36,10 +36,14 @@ export function serializePublicProduct(product: Product) {
   };
 }
 
-export function serializeOrder(order: Order & { items: OrderItem[] }) {
+export function serializeOrder(
+  order: Order & { items: OrderItem[]; user?: { full_name: string; email: string | null } | null },
+) {
   return {
     id: order.id,
     user_id: order.user_id,
+    // Registered customer's name if this order is tied to an account, else the guest snapshot, else "Guest".
+    customer_name: order.user?.full_name ?? order.guest_name ?? "Guest",
     guest_id: order.guest_id,
     guest_name: order.guest_name,
     guest_phone_home: order.guest_phone_home,
