@@ -13,8 +13,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-    expose:
-      - "5432"
+    ports:
+      - "127.0.0.1:5432:5432"
 
   redis:
     image: redis:7-alpine
@@ -26,8 +26,18 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  # Catches outgoing emails in dev (OTP codes, password resets) — no real sending.
+  # Web UI at http://localhost:8025
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8025:8025"
     expose:
-      - "6379"
+      - "1025"
 
   backend:
     build:
@@ -38,11 +48,29 @@ services:
       PORT: 3000
       DATABASE_URL: postgres://${POSTGRES_USER:-ecommerce}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ecommerce}
       REDIS_URL: redis://redis:6379
+      CORS_ORIGIN: ${CORS_ORIGIN:?set CORS_ORIGIN in .env}
+      ADMIN_JWT_ACCESS_SECRET: ${ADMIN_JWT_ACCESS_SECRET:?set ADMIN_JWT_ACCESS_SECRET in .env}
+      ADMIN_JWT_ACCESS_TTL: ${ADMIN_JWT_ACCESS_TTL:-15m}
+      ADMIN_REFRESH_TOKEN_TTL_DAYS: ${ADMIN_REFRESH_TOKEN_TTL_DAYS:-30}
+      SESSION_TTL_DAYS: ${SESSION_TTL_DAYS:-30}
+      GUEST_COOKIE_TTL_DAYS: ${GUEST_COOKIE_TTL_DAYS:-365}
+      COOKIE_SECRET: ${COOKIE_SECRET:?set COOKIE_SECRET in .env}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      OTP_TTL_MINUTES: ${OTP_TTL_MINUTES:-10}
+      OTP_MAX_ATTEMPTS: ${OTP_MAX_ATTEMPTS:-5}
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      EMAIL_FROM: ${EMAIL_FROM:-no-reply@example.com}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
+      RATE_LIMIT_GLOBAL_MAX: ${RATE_LIMIT_GLOBAL_MAX:-100}
+      RATE_LIMIT_GLOBAL_WINDOW: ${RATE_LIMIT_GLOBAL_WINDOW:-1 minute}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      mailhog:
+        condition: service_started
     expose:
       - "3000"
 
