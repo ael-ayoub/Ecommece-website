@@ -1,6 +1,37 @@
-.env
+# Dependencies
 node_modules/
-dist/
-.astro/
-docs/
-For_search.md
+
+# Next.js build output
+.next/
+out/
+build/
+
+# Environment files — never commit secrets. .env.example is intentionally NOT listed here.
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Misc
+.vercel/
+coverage/

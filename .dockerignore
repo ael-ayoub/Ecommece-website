@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.env
+.env.local
+.env*.local
+npm-debug.log*
+docs
+tests
+src/generated
+*.md
+.vscode
+.idea
