@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/guards/require-admin";
 import { ensureOrderListener, orderEvents } from "@/lib/realtime/listener";
+import { handleApiError } from "@/lib/errors";
 
 // Requires a persistent Node connection (the LISTEN client in
 // src/lib/realtime/listener.ts) — must run on the Node runtime, and must
@@ -18,7 +19,19 @@ const HEARTBEAT_MS = 20_000;
 // pattern). No notification/toast content is ever sent — this stream is
 // pure UI-refresh signaling.
 export async function GET(req: NextRequest) {
-  await requireAdmin();
+  // Unlike every other route, this one can't just be wrapped in one
+  // top-level try/catch (the rest of the function returns a streaming
+  // Response, not a plain JSON one) — so the auth check is deliberately
+  // isolated here and reported through the same handleApiError() every
+  // other route uses, instead of being allowed to propagate as an
+  // unhandled exception (which Next.js turns into an opaque 500 rather
+  // than the intended 401/403).
+  try {
+    await requireAdmin();
+  } catch (err) {
+    return handleApiError(err);
+  }
+
   ensureOrderListener();
 
   const encoder = new TextEncoder();
