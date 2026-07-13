@@ -3,7 +3,10 @@ import { verifyJwtEdge } from "@/lib/jwt-edge";
 import { AUTH_COOKIE_NAME } from "@/lib/auth-cookie";
 
 export const config = {
-  matcher: ["/account/:path*", "/admin/:path*"],
+  // /orders is logged-in only (architecture.md §6 — guests have no order
+  // tracking); /checkout is intentionally NOT here, since guest checkout
+  // must remain reachable without an account.
+  matcher: ["/account/:path*", "/orders/:path*", "/admin/:path*"],
 };
 
 export async function middleware(req: NextRequest) {

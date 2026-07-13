@@ -62,14 +62,12 @@ export default function CartPage() {
         <Link href="/products" className="text-sm underline">
           ← Continue Shopping
         </Link>
-        <button
-          type="button"
-          disabled
-          title="Checkout arrives in a later phase"
-          className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+        <Link
+          href="/checkout"
+          className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
         >
           Proceed to Checkout
-        </button>
+        </Link>
       </div>
     </div>
   );

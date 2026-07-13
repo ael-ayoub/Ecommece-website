@@ -41,6 +41,9 @@ export function Header() {
             <Link href="/account" className="hover:underline">
               {user.name}
             </Link>
+            <Link href="/orders" className="hover:underline">
+              My Orders
+            </Link>
             {user.role === "ADMIN" && (
               <Link href="/admin/products" className="hover:underline">
                 Admin
