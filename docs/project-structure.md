@@ -43,7 +43,9 @@ Similarly, hooks live in exactly one place — `src/hooks/` — not duplicated b
 
 **Purpose:** every route the platform serves — client pages, admin pages, and API routes — using Next.js 14's file-based App Router.
 
-**Why this structure:** file-based routing means the directory tree _is_ the site map — there's no separate routing config file to keep in sync with reality. Route groups (folders in parentheses, e.g. `(admin)`) let related pages share a layout and be organized together in the file tree without that grouping leaking into the URL.
+**Why this structure:** file-based routing means the directory tree _is_ the site map — there's no separate routing config file to keep in sync with reality. Route groups (folders in parentheses, e.g. `(auth)`, `(client)`) let related pages share a layout and be organized together in the file tree without that grouping leaking into the URL.
+
+**Correction made during Phase 2 implementation:** the admin section below is a real `admin/` path segment, not a `(admin)` route group. An earlier draft of this document used `(admin)` — that was wrong: route groups are stripped from the URL entirely, so `(admin)/products/page.tsx` would have resolved to `/products`, the exact same URL as `(client)/products/page.tsx`, which Next.js rejects as a duplicate route at build time. A real `admin/` segment gives every admin page its own `/admin/...` URL space (`/admin/products`, `/admin/orders`, etc.) with no collision, and is also what lets `src/middleware.ts` protect the whole subtree with a single path-prefix match (`/admin/:path*`) instead of an allowlist of individual routes.
 
 ```
 src/app/
@@ -62,19 +64,19 @@ src/app/
 │   │   └── [id]/page.tsx      # /orders/:id
 │   ├── account/page.tsx       # /account
 │   └── layout.tsx             # client header/footer shell
-├── (admin)/                   # Everything only role=admin can reach
-│   ├── dashboard/page.tsx     # /dashboard — analytics (admin-dashboard-spec.md §3)
+├── admin/                     # Real path segment (not a route group) — everything only role=admin can reach
+│   ├── dashboard/page.tsx     # /admin/dashboard — analytics (admin-dashboard-spec.md §3)
 │   ├── orders/
-│   │   ├── page.tsx           # /orders (admin list — distinct from client's /orders above)
+│   │   ├── page.tsx           # /admin/orders (admin list — distinct from client's /orders above)
 │   │   └── [id]/page.tsx
 │   ├── products/
-│   │   ├── page.tsx
+│   │   ├── page.tsx           # /admin/products
 │   │   ├── new/page.tsx
 │   │   └── [id]/
 │   │       ├── page.tsx
 │   │       └── variants/page.tsx
 │   ├── categories/
-│   │   ├── page.tsx
+│   │   ├── page.tsx           # /admin/categories
 │   │   ├── new/page.tsx
 │   │   └── [id]/page.tsx
 │   ├── clients/
@@ -100,9 +102,9 @@ src/app/
 └── error.tsx                  # Global error boundary
 ```
 
-**Architectural principle — route grouping mirrors the permissions matrix, not convenience.** `(client)` and `(admin)` aren't just a filing convenience: they exist because [architecture.md](architecture.md) Section 6 draws a hard permissions line between what a client can reach and what only the admin can. Grouping by that line means the middleware that enforces it (Section 2.5 below) can target a whole group at once (`/app/(admin)/**`) instead of listing every individual admin route by hand — the file structure enforces the business rule instead of merely reflecting it.
+**Architectural principle — route structure mirrors the permissions matrix, not convenience.** `(client)` and `admin/` aren't just a filing convenience: they exist because [architecture.md](architecture.md) Section 6 draws a hard permissions line between what a client can reach and what only the admin can. `admin/` being a real path prefix is what lets `src/middleware.ts` (Section 2.5 below) target the whole subtree at once (`/admin/:path*`) instead of listing every individual admin route by hand — the file structure enforces the business rule instead of merely reflecting it.
 
-**Note on the `orders` naming collision:** `(client)/orders` and `(admin)/orders` are two different route trees that happen to share a folder name — this is intentional and safe, since route groups don't merge; `/orders` (client, own history) and `/admin/orders`-equivalent (via the admin layout) never collide in the actual URL space. It's called out here specifically so it isn't mistaken for a bug later.
+**Note on the `orders` naming similarity:** `(client)/orders` and `admin/orders` are two different route trees that happen to share a folder name one level down — this is safe specifically because `admin/` is a real segment, so the URLs are `/orders` (client, own history) and `/admin/orders` (admin, all orders) — genuinely different paths, not a collision. This would NOT have been safe under the original `(admin)` route-group draft, which is exactly why that draft was corrected.
 
 **Dependencies:** page and layout files import from `components/`, `hooks/`, `types/`; API route files import from `services/` and `middleware/` — never directly from `lib/db.ts` inside a page component (see the layering rule in Section 3).
 
@@ -134,7 +136,7 @@ src/components/
 2. `layout/` and `common/` — reused across _every_ feature but carry a little more shape than raw UI primitives (a `StatusBadge` knows about the six order statuses; a `Pagination` knows about page numbers). Still no domain/business logic.
 3. Feature folders (`products/`, `cart/`, `orders/`, `admin/*`) — components that know about the domain. `OrderStatus.tsx` knows the six-state lifecycle from [architecture.md](architecture.md) Section 3; `VariantManager.tsx` knows a variant can be enabled/disabled but not deleted.
 
-The `admin/` subtree is nested one level deeper than the other feature folders specifically because it mirrors the route grouping in `app/(admin)/` — the same permissions boundary shows up in the component tree, reinforcing (not duplicating) the routing decision. `RealtimeOrderWatcher.tsx` is deliberately its own component rather than logic buried inside `AdminOrderList.tsx`, because the Realtime subscription needs to live at a level that outlives any single list (e.g., mounted once in the admin layout) and feed updates down — isolating it makes it the one place to look when debugging "why didn't the list update."
+The `admin/` subtree is nested one level deeper than the other feature folders specifically because it mirrors the real `app/admin/` path segment — the same permissions boundary shows up in the component tree, reinforcing (not duplicating) the routing decision. `RealtimeOrderWatcher.tsx` is deliberately its own component rather than logic buried inside `AdminOrderList.tsx`, because the Realtime subscription needs to live at a level that outlives any single list (e.g., mounted once in the admin layout) and feed updates down — isolating it makes it the one place to look when debugging "why didn't the list update."
 
 **Dependencies:** components import from `hooks/`, `types/`, and `ui/` — never from `services/` or `lib/db.ts` directly. A component that needs data calls a hook; the hook calls the API. This keeps every component testable by mocking one hook, rather than mocking a database client.
 
@@ -176,18 +178,24 @@ src/types/
 
 **Why this structure:** organizing by domain (not by "requests" vs. "responses" vs. "models") means anyone touching an Order-related feature opens exactly one file to see everything Order-shaped, instead of hunting across three generic files. `index.ts` exists purely so the rest of the app can write `import { Order, OrderStatus } from "@/types"` instead of remembering which domain file each type lives in — a small convenience that removes a whole class of "where was that type again" friction.
 
-### 2.5 `src/middleware/`
+### 2.5 Authentication & authorization enforcement
 
 **Purpose:** the enforcement point for authentication and role checks — the code that actually reads the permissions matrix from [architecture.md](architecture.md) Section 6 and turns it into "reject this request."
 
+**Correction made during Phase 2 implementation:** this was originally planned as its own `src/middleware/` folder. That name is reserved by Next.js — when using a `src/` directory, Next.js requires the actual Edge Middleware file at exactly `src/middleware.ts`, which cannot coexist with a folder of the same name. The enforcement logic is split across two locations instead:
+
 ```
-src/middleware/
-├── auth.ts           # verifies the JWT on incoming requests, attaches the decoded user to the request context
-├── adminOnly.ts        # rejects (403) if the verified user's role isn't 'admin'
-└── errorHandler.ts       # catches thrown errors from services/routes, maps them to consistent HTTP responses
+src/middleware.ts              # Next.js Edge Middleware (real file, not a folder) — page-level
+                                #   redirects for /account/** and /admin/** based on the JWT cookie,
+                                #   using src/lib/jwt-edge.ts (jose, Edge-runtime-safe — the Node
+                                #   `jsonwebtoken` package used elsewhere can't run on the Edge runtime)
+
+src/lib/guards/
+├── require-user.ts   # call at the top of any API route requiring a logged-in user (401 if none)
+└── require-admin.ts   # call at the top of any admin-only API route (401 if not logged in, 403 if not ADMIN)
 ```
 
-**Why this exists as its own top-level folder, not folded into `lib/`:** authorization is the one category of logic in this codebase where a bug is a security incident, not a UI glitch. Giving it a dedicated, small, easy-to-audit folder — rather than letting it blend in among formatting helpers — is a deliberate signal: "if you're touching anything in here, slow down and think about the permissions matrix." Every admin API route and every admin page's server-side check runs through `adminOnly.ts`; there is exactly one implementation of "is this an admin," not one per route.
+**Why authorization still gets dedicated files, just not a dedicated top-level folder:** authorization is the one category of logic in this codebase where a bug is a security incident, not a UI glitch. `require-user.ts`/`require-admin.ts` stay small, single-purpose, and named for exactly what they check — a deliberate signal to slow down when touching them. Every admin API route runs through `requireAdmin()`; there is exactly one implementation of "is this an admin," not one per route. Page-level protection (redirecting an unauthenticated browser away from `/admin/products` before the page even renders) is a genuinely different mechanism from API-level protection (rejecting a fetch to `/api/admin/products` with a 403) — Edge Middleware can only do the former, so both layers exist and each enforces the same rule at a different point in the request lifecycle.
 
 ### 2.6 `src/services/`
 
@@ -324,7 +332,7 @@ Each layer only talks to the layer directly below it. A component never imports 
 
 ### 3.2 Route structure mirrors the permissions model, not just the URL space
 
-As covered in Section 2.1: `(client)` vs `(admin)` route groups exist because [architecture.md](architecture.md)'s permissions matrix is the actual reason these pages are separated — the file tree is a direct expression of who's allowed to see what, which is also what lets a single `adminOnly` middleware check protect an entire subtree at once instead of being manually applied route-by-route (and forgotten on the next new admin page).
+As covered in Section 2.1: the `(client)` route group vs. the real `admin/` path segment exist because [architecture.md](architecture.md)'s permissions matrix is the actual reason these pages are separated — the file tree is a direct expression of who's allowed to see what, which is also what lets `src/middleware.ts`'s `/admin/:path*` matcher protect an entire subtree at once instead of being manually applied route-by-route (and forgotten on the next new admin page).
 
 ### 3.3 One canonical location per concern
 
