@@ -1,5 +1,7 @@
-# Local development only. Production deploys the Next.js app to Vercel and
-# uses a managed PostgreSQL provider — this file is never used in production.
+# Fully containerized local stack — both the database and the app run in
+# containers, orchestrated by `make` (see Makefile). This is a
+# container-based deployment path in addition to the Vercel path described
+# in docs/architecture.md §18.
 
 services:
   db:
@@ -22,7 +24,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
     restart: unless-stopped
     env_file:
       - .env.local
@@ -30,10 +32,6 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-ecommerce}:${POSTGRES_PASSWORD:-change_me}@db:5432/${POSTGRES_DB:-ecommerce}?schema=public
     ports:
       - "3000:3000"
-    volumes:
-      - .:/app
-      - /app/node_modules
-      - /app/.next
     depends_on:
       db:
         condition: service_healthy

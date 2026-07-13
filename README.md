@@ -4,7 +4,7 @@ Cash-on-Delivery marketplace — Next.js 14 (App Router, TypeScript), PostgreSQL
 
 See [docs/architecture.md](docs/architecture.md), [docs/admin-dashboard-spec.md](docs/admin-dashboard-spec.md), [docs/client-interface-spec.md](docs/client-interface-spec.md), and [docs/project-structure.md](docs/project-structure.md) for the full design. This README only covers running the project locally.
 
-**Status:** Phase 0 — foundation only. No business logic, no database models, no real pages yet.
+**Status:** v1 complete — auth, product catalog, cart, checkout, order management, admin dashboard with real-time updates.
 
 ## Tech stack (v1)
 
@@ -12,70 +12,40 @@ Next.js 14+ (App Router, TS) · Tailwind CSS + shadcn/ui · React Query · Recha
 
 ## Local development
 
-### Option A — without Docker (Node + a local/remote Postgres)
+The whole stack — Postgres **and** the app — runs in containers, driven by a `Makefile`:
 
-1. Install dependencies:
-   ```
-   npm install
-   ```
-2. Copy the env template and fill in real values:
+1. Copy the env template and fill in real values:
    ```
    cp .env.example .env.local
    ```
-   At minimum, set `DATABASE_URL` to point at a reachable PostgreSQL 15+ database, and set `JWT_SECRET` (generate one with `openssl rand -hex 32`).
-3. Generate the Prisma client and apply migrations (none exist yet in Phase 0 beyond the base config):
+   Set `JWT_SECRET` (generate one with `openssl rand -hex 32`) and `ADMIN_EMAIL`/`ADMIN_PASSWORD` (the login the seed script creates — change these and re-seed any time to change the admin account, no code edit needed). Leave `DATABASE_URL`/`POSTGRES_*` as-is unless you need to change the local Postgres credentials.
+2. Build and start everything:
    ```
-   npm run prisma:generate
+   make
    ```
-4. Start the dev server:
+   This builds the app image, starts Postgres and the app, and applies any pending migrations automatically on container startup. The app is served at http://localhost:3000; Postgres is reachable at `localhost:5432` for a GUI client.
+3. Populate the database with sample data:
    ```
-   npm run dev
-   ```
-   The app is served at http://localhost:3000.
-
-### Option B — with Docker Compose (Postgres + the app, for local dev only)
-
-1. Copy the env template:
-   ```
-   cp .env.example .env.local
-   ```
-   Set `JWT_SECRET`; the `DATABASE_URL` you put here is only used if you run the app _outside_ Docker — inside Compose, the app container is given its own `DATABASE_URL` pointing at the `db` service (see `docker-compose.yml`).
-2. Build and start both services:
-   ```
-   npm run docker:up
-   ```
-   or directly: `docker compose up -d --build`
-3. The app is reachable at http://localhost:3000; Postgres is reachable at `localhost:5432` (for a GUI client) using the `POSTGRES_*` credentials from your `.env.local`.
-4. Stop everything with:
-   ```
-   npm run docker:down
+   make seed
    ```
 
-`Dockerfile.dev` and `docker-compose.yml` are **development-only**. There is no production Dockerfile — see below.
+That's the whole loop. Four targets, nothing else:
 
-## Useful scripts
+| Command      | Does                                                                     |
+| ------------ | ------------------------------------------------------------------------- |
+| `make`       | Build and start the full containerized stack (Postgres + app)             |
+| `make seed`  | Run the seed script inside the app container                              |
+| `make clean` | Stop and remove the containers — keeps your database volume (your data)   |
+| `make fclean`| Full reset: also removes the database volume, built images, `node_modules`, and `.next` — back to a fresh checkout |
 
-| Script                                                               | Purpose                                            |
-| -------------------------------------------------------------------- | -------------------------------------------------- |
-| `npm run dev`                                                        | Start the Next.js dev server                       |
-| `npm run build`                                                      | Production build                                   |
-| `npm run lint`                                                       | Run ESLint                                         |
-| `npm run format` / `format:check`                                    | Prettier write / check                             |
-| `npm run prisma:generate`                                            | Regenerate the Prisma client after a schema change |
-| `npm run prisma:migrate`                                             | Create + apply a dev migration                     |
-| `npm run prisma:deploy`                                              | Apply existing migrations (production)             |
-| `npm run prisma:studio`                                              | Open Prisma Studio                                 |
-| `npm run prisma:seed`                                                | Run the seed script                                |
-| `npm run docker:up` / `docker:down` / `docker:build` / `docker:logs` | Manage the local Docker Compose stack              |
+Running `npm install` locally afterward is optional — it's only needed for your editor's TypeScript/ESLint tooling, not to run the app, since the container builds its own dependencies independently.
 
 ## How production deployment differs
 
-Production does **not** use Docker or Docker Compose at all — those exist purely to make local development reproducible.
-
-- **Hosting:** the Next.js app (frontend + API routes) deploys to **Vercel**, built directly from the git repository — no container image is built or shipped.
-- **Database:** a managed PostgreSQL 15+ instance (not the `postgres:15-alpine` container from `docker-compose.yml`). `DATABASE_URL` points at that managed instance instead of `localhost`/`db`.
-- **Migrations:** applied with `prisma migrate deploy` (not `migrate dev`) against the production database, typically as part of the deploy step.
-- **Environment variables:** set directly in Vercel's project settings (not read from `.env.local`, which never leaves your machine). See `.env.example` for the full list of variable names required.
+- **Hosting:** the Next.js app (frontend + API routes) deploys to **Vercel**, built directly from the git repository — no container image is built or shipped there. The `Dockerfile`/`docker-compose.yml` here are for local development and for a container-based deployment target, if you use one instead of Vercel.
+- **Database:** a managed PostgreSQL 15+ instance in production (not the `postgres:15-alpine` container). `DATABASE_URL` points at that managed instance instead of `db`.
+- **Migrations:** applied with `prisma migrate deploy` — the same command the app container already runs on every startup here, just against the production database.
+- **Environment variables:** set directly in Vercel's project settings (or your container platform's secrets) — not read from `.env.local`, which never leaves your machine.
 - **Real-time / images:** Supabase Realtime and Cloudinary are external managed services in both environments — locally and in production, the app connects to the same hosted services, just with different project credentials.
 
 Full deployment checklist: [docs/architecture.md](docs/architecture.md), Section 18.

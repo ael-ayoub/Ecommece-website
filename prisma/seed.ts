@@ -25,13 +25,26 @@ async function main() {
   ]);
 
   // --- Users ---------------------------------------------------------------
-  const passwordHash = await bcrypt.hash("Password123!", 10);
+  // Admin credentials come from the environment (ADMIN_EMAIL/ADMIN_PASSWORD)
+  // so the login can be changed by editing .env.local and re-running the
+  // seed — never hardcoded here. Demo client accounts stay fixed since
+  // they're just sample data, not something you'd need to reconfigure.
+  const adminEmail = process.env.ADMIN_EMAIL;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminEmail || !adminPassword) {
+    throw new Error(
+      "ADMIN_EMAIL and ADMIN_PASSWORD must be set in .env.local before seeding — see .env.example.",
+    );
+  }
+
+  const adminPasswordHash = await bcrypt.hash(adminPassword, 10);
+  const demoPasswordHash = await bcrypt.hash("Password123!", 10);
 
   const admin = await db.user.create({
     data: {
       name: "Marketplace Admin",
-      email: "admin@example.com",
-      passwordHash,
+      email: adminEmail,
+      passwordHash: adminPasswordHash,
       phone: "555-0100",
       role: Role.ADMIN,
     },
@@ -41,7 +54,7 @@ async function main() {
     data: {
       name: "Jane Doe",
       email: "jane@example.com",
-      passwordHash,
+      passwordHash: demoPasswordHash,
       phone: "555-0101",
       role: Role.CLIENT,
     },
@@ -51,7 +64,7 @@ async function main() {
     data: {
       name: "Ali Karim",
       email: "ali@example.com",
-      passwordHash,
+      passwordHash: demoPasswordHash,
       phone: "555-0192",
       role: Role.CLIENT,
     },
