@@ -18,6 +18,31 @@ const orderInclude = {
   },
 } as const;
 
+type Tx = Prisma.TransactionClient;
+
+interface LockedOrderRow {
+  id: number;
+  userId: number | null;
+  status: OrderStatus;
+}
+
+// Locks the Order row itself for the duration of a read-validate-write
+// status change (Phase 8 hardening). Without this, two concurrent status
+// changes on the *same* order (e.g. two admin tabs both clicking Cancel, or
+// an admin and the owning client racing each other) can each read the same
+// pre-change status under READ COMMITTED, both pass validation, and both
+// restore stock — a real double-restoration bug found and fixed in Phase 8
+// (reproduced: two concurrent cancels on one order inflated stock by 2x the
+// order's quantity instead of 1x). FOR UPDATE here means the second
+// transaction blocks until the first commits, then reads the *already
+// updated* status and correctly rejects instead of double-processing.
+async function lockOrderForUpdate(tx: Tx, orderId: number): Promise<LockedOrderRow | null> {
+  const rows = await tx.$queryRaw<LockedOrderRow[]>`
+    SELECT id, "userId", status FROM "Order" WHERE id = ${orderId} FOR UPDATE
+  `;
+  return rows[0] ?? null;
+}
+
 export async function createOrder(input: OrderCreateInput, userId: number | null) {
   const order = await db.$transaction(async (tx) => {
     // Locks every requested variant row, validates live stock, decrements,
@@ -91,23 +116,25 @@ export async function getOrderForUser(orderId: number, userId: number) {
 // state, any order) is a separate, broader operation added in Phase 6.
 export async function cancelOrderAsOwner(orderId: number, userId: number) {
   const order = await db.$transaction(async (tx) => {
-    const order = await tx.order.findUnique({
-      where: { id: orderId },
-      include: { items: { include: { variant: true } } },
-    });
+    const locked = await lockOrderForUpdate(tx, orderId);
 
-    if (!order || order.userId !== userId) {
+    if (!locked || locked.userId !== userId) {
       throw new NotFoundError("Order not found.");
     }
-    if (order.status !== OrderStatus.PENDING) {
+    if (locked.status !== OrderStatus.PENDING) {
       throw new ConflictError("Only Pending orders can be cancelled.");
     }
+
+    const items = await tx.orderItem.findMany({
+      where: { orderId },
+      include: { variant: true },
+    });
 
     // Every locked variant here has a live productVariantId in practice
     // (variants are only ever disabled, never hard-deleted — architecture.md
     // §8) — the null-filter is defensive: a deleted variant's stock has
     // nothing to restore to, but the order itself still gets cancelled.
-    const restorable = order.items
+    const restorable = items
       .map((item) => item.variant)
       .filter((v): v is NonNullable<typeof v> => v !== null && v.productVariantId !== null)
       .map((v) => ({ variantId: v.productVariantId as number, quantity: v.quantity }));
@@ -173,22 +200,24 @@ export async function listRecentOrders(limit: number) {
 // implementation of "how stock comes back," per inventory.service.ts).
 export async function updateOrderStatusAsAdmin(orderId: number, nextStatus: OrderStatusValue) {
   const order = await db.$transaction(async (tx) => {
-    const order = await tx.order.findUnique({
-      where: { id: orderId },
-      include: { items: { include: { variant: true } } },
-    });
+    const locked = await lockOrderForUpdate(tx, orderId);
 
-    if (!order) {
+    if (!locked) {
       throw new NotFoundError("Order not found.");
     }
 
-    const allowed = ADMIN_ORDER_TRANSITIONS[order.status as OrderStatusValue];
+    const allowed = ADMIN_ORDER_TRANSITIONS[locked.status as OrderStatusValue];
     if (!allowed.includes(nextStatus)) {
-      throw new ConflictError(`Cannot move an order from ${order.status} to ${nextStatus}.`);
+      throw new ConflictError(`Cannot move an order from ${locked.status} to ${nextStatus}.`);
     }
 
     if (STOCK_RESTORING_STATUSES.includes(nextStatus)) {
-      const restorable = order.items
+      const items = await tx.orderItem.findMany({
+        where: { orderId },
+        include: { variant: true },
+      });
+
+      const restorable = items
         .map((item) => item.variant)
         .filter((v): v is NonNullable<typeof v> => v !== null && v.productVariantId !== null)
         .map((v) => ({ variantId: v.productVariantId as number, quantity: v.quantity }));
