@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { Prisma, OrderStatus } from "@prisma/client";
 import { lockAndDecrementStock, restoreStock } from "@/services/inventory.service";
+import { notifyOrderChanged } from "@/lib/realtime/notify";
 import { ConflictError, NotFoundError } from "@/lib/errors";
 import { ADMIN_ORDER_TRANSITIONS, STOCK_RESTORING_STATUSES } from "@/constants/order-status";
 import type { OrderCreateInput } from "@/lib/validators";
@@ -18,7 +19,7 @@ const orderInclude = {
 } as const;
 
 export async function createOrder(input: OrderCreateInput, userId: number | null) {
-  return db.$transaction(async (tx) => {
+  const order = await db.$transaction(async (tx) => {
     // Locks every requested variant row, validates live stock, decrements,
     // and returns the snapshot data (name/label/price) to freeze onto the
     // order — all atomically, so a concurrent order for the same variant
@@ -59,6 +60,11 @@ export async function createOrder(input: OrderCreateInput, userId: number | null
       include: orderInclude,
     });
   });
+
+  // Fired only after the transaction has committed — purely observational,
+  // never part of the stock/order logic itself (architecture.md §11).
+  await notifyOrderChanged(order.id);
+  return order;
 }
 
 export async function listOrdersForUser(userId: number) {
@@ -84,7 +90,7 @@ export async function getOrderForUser(orderId: number, userId: number) {
 // Pending (architecture.md §3.2/§3.3). Admin cancel/return (any non-terminal
 // state, any order) is a separate, broader operation added in Phase 6.
 export async function cancelOrderAsOwner(orderId: number, userId: number) {
-  return db.$transaction(async (tx) => {
+  const order = await db.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
       where: { id: orderId },
       include: { items: { include: { variant: true } } },
@@ -114,6 +120,9 @@ export async function cancelOrderAsOwner(orderId: number, userId: number) {
       include: orderInclude,
     });
   });
+
+  await notifyOrderChanged(order.id);
+  return order;
 }
 
 // Admin ownership bypass — admin can view any order regardless of who placed it.
@@ -163,7 +172,7 @@ export async function listRecentOrders(limit: number) {
 // the same restoreStock() the client's own cancellation uses (one
 // implementation of "how stock comes back," per inventory.service.ts).
 export async function updateOrderStatusAsAdmin(orderId: number, nextStatus: OrderStatusValue) {
-  return db.$transaction(async (tx) => {
+  const order = await db.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
       where: { id: orderId },
       include: { items: { include: { variant: true } } },
@@ -193,4 +202,7 @@ export async function updateOrderStatusAsAdmin(orderId: number, nextStatus: Orde
       include: orderInclude,
     });
   });
+
+  await notifyOrderChanged(order.id);
+  return order;
 }

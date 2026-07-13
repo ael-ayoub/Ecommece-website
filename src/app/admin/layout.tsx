@@ -1,12 +1,20 @@
 import Link from "next/link";
+import { RealtimeStatusIndicator } from "@/components/admin/RealtimeStatusIndicator";
 
 // Page-level access control already happens in src/middleware.ts
 // (matcher: /admin/:path* — redirects non-admins away before this renders).
+// RealtimeStatusIndicator (a Client Component) is what actually opens the
+// admin real-time connection — mounting it here, and only here, is what
+// scopes live updates to the admin section (architecture.md §11's "client
+// pages don't need live updates" rule) without touching (client)/* pages.
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen">
       <aside className="w-56 shrink-0 border-r border-gray-200 p-4">
-        <p className="mb-4 font-bold">Admin</p>
+        <div className="mb-4 flex items-center justify-between">
+          <p className="font-bold">Admin</p>
+          <RealtimeStatusIndicator />
+        </div>
         <nav className="flex flex-col gap-1 text-sm">
           <Link href="/admin/dashboard" className="rounded px-2 py-1 hover:bg-gray-100">
             Dashboard

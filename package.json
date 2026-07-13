@@ -30,6 +30,7 @@
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.24.0",
     "next": "14.2.35",
+    "pg": "^8.22.0",
     "prisma": "^6.19.3",
     "react": "^18",
     "react-dom": "^18",
@@ -41,6 +42,7 @@
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
+    "@types/pg": "^8.20.0",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "dotenv": "^17.4.2",
