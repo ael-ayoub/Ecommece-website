@@ -1,6 +1,12 @@
 // E-Commerce Platform v1 — Prisma schema.
-// Phase 0: datasource + generator configuration only. Models are added in Phase 1
-// per the entities defined in docs/architecture.md Section 2.
+// Phase 1: data layer only (see docs/architecture.md Section 2 for the entity
+// definitions and business rules this schema encodes). No API/UI logic here.
+//
+// ID strategy: integer autoincrement primary keys everywhere. Chosen so Order
+// IDs match the friendly "#1042"-style references used throughout
+// docs/admin-dashboard-spec.md and docs/client-interface-spec.md without a
+// separate display-number field. COD marketplace, not a high ID-enumeration-risk
+// context, so this is a deliberate simplicity choice for v1.
 
 generator client {
   provider = "prisma-client-js"
@@ -9,4 +15,175 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+// --- Enums -------------------------------------------------------------
+
+enum Role {
+  ADMIN
+  CLIENT
+}
+
+// Exactly the six locked states from docs/architecture.md Section 3.
+// Do not add, remove, or rename values without updating the architecture doc.
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  SHIPPED
+  DELIVERED
+  RETURNED
+  CANCELLED
+}
+
+// --- User ----------------------------------------------------------------
+// Single identity table for both admins and clients (architecture.md §2.1).
+
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  passwordHash String
+  phone        String
+  role         Role     @default(CLIENT)
+  createdAt    DateTime @default(now())
+
+  orders Order[]
+
+  @@index([role])
+}
+
+// --- Category --------------------------------------------------------------
+// architecture.md §2.2 — one Category has many Products; a Product belongs to
+// exactly one Category (enforced by Product.categoryId being required, not nullable).
+
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+
+  products Product[]
+}
+
+// --- Product ---------------------------------------------------------------
+// architecture.md §2.3 — shared descriptive data; stock/price live on variants.
+
+model Product {
+  id          Int      @id @default(autoincrement())
+  categoryId  Int
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  name        String
+  description String
+  basePrice   Decimal  @db.Decimal(10, 2)
+  images      String[]
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  variants   ProductVariant[]
+  orderItems OrderItem[]
+
+  @@index([categoryId])
+  @@index([isActive])
+  @@index([name])
+}
+
+// --- ProductVariant ----------------------------------------------------------
+// architecture.md §2.4 — the only place stock and purchasable price live.
+// Deliberately never hard-deleted (see docs/admin-dashboard-spec.md §5): only
+// disabled via isActive. onDelete: Cascade on the Product relation exists only
+// as a database-level safety net if a Product row is ever truly removed.
+
+model ProductVariant {
+  id            Int      @id @default(autoincrement())
+  productId     Int
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantLabel  String
+  price         Decimal? @db.Decimal(10, 2)
+  stockQuantity Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  orderItemVariants OrderItemVariant[]
+
+  @@unique([productId, variantLabel])
+  @@index([productId])
+  @@index([isActive])
+}
+
+// --- Order -------------------------------------------------------------------
+// architecture.md §2.6, refined per Phase 1 instruction #6: contact/shipping
+// fields live directly on the order for EVERY order, guest or logged-in, since
+// even a logged-in client supplies (or edits) delivery info per order — see
+// docs/client-interface-spec.md §6 Path B. userId is optional (null = guest order).
+//
+// NOTE — naming deviation from architecture.md §2.6: that doc named these
+// fields guest_name/guest_email/guest_phone, implying they're guest-only. They
+// are renamed here (contactName/contactEmail/contactPhone) to reflect that
+// they're populated for every order regardless of login status. Flagging this
+// for architecture.md to be updated to match.
+
+model Order {
+  id               Int         @id @default(autoincrement())
+  userId           Int?
+  user             User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  contactName      String
+  contactEmail     String
+  contactPhone     String
+  shippingAddress  String
+  status           OrderStatus @default(PENDING)
+  totalAmount      Decimal     @db.Decimal(10, 2)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  items OrderItem[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([status, createdAt])
+}
+
+// --- OrderItem / OrderItemVariant ---------------------------------------------
+// architecture.md §2.7 originally merged these into a single OrderItem (one
+// variant + qty per line). Phase 1 instruction #7 explicitly asks for both
+// OrderItem and OrderItemVariant as distinct models, so this schema splits
+// the historical snapshot across two tables instead of one:
+//   - OrderItem      : which Product was ordered (product-level snapshot)
+//   - OrderItemVariant: which variant, at what price, in what quantity
+//                       (variant-level snapshot) — one-to-one with its OrderItem
+// Flagging this restructure for architecture.md §2.7 to be updated to match.
+//
+// Both productId and productVariantId are nullable with onDelete: SetNull so
+// that if a Product/ProductVariant row is ever removed, the historical order
+// record survives intact via the snapshot fields — the FK is a convenience
+// link to the live record, never the source of truth for past orders.
+
+model OrderItem {
+  id                  Int      @id @default(autoincrement())
+  orderId             Int
+  order               Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId           Int?
+  product             Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productNameSnapshot String
+  createdAt           DateTime @default(now())
+
+  variant OrderItemVariant?
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model OrderItemVariant {
+  id                    Int             @id @default(autoincrement())
+  orderItemId           Int             @unique
+  orderItem             OrderItem       @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  productVariantId      Int?
+  productVariant        ProductVariant? @relation(fields: [productVariantId], references: [id], onDelete: SetNull)
+  variantLabelSnapshot  String
+  unitPriceSnapshot     Decimal         @db.Decimal(10, 2)
+  quantity              Int
+
+  @@index([productVariantId])
 }
