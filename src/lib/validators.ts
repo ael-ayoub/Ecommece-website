@@ -68,3 +68,10 @@ export const orderCreateSchema = z.object({
     .min(1, "Your cart is empty"),
 });
 export type OrderCreateInput = z.infer<typeof orderCreateSchema>;
+
+// --- Admin order management (Phase 6) ---------------------------------------
+
+export const orderStatusUpdateSchema = z.object({
+  status: z.enum(["PENDING", "CONFIRMED", "SHIPPED", "DELIVERED", "RETURNED", "CANCELLED"]),
+});
+export type OrderStatusUpdateInput = z.infer<typeof orderStatusUpdateSchema>;

@@ -45,7 +45,7 @@ export function Header() {
               My Orders
             </Link>
             {user.role === "ADMIN" && (
-              <Link href="/admin/products" className="hover:underline">
+              <Link href="/admin/dashboard" className="hover:underline">
                 Admin
               </Link>
             )}

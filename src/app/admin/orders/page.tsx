@@ -1,0 +1,121 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/api-client";
+import { StatusBadge } from "@/components/common/StatusBadge";
+import { formatCurrency } from "@/lib/format";
+import { ORDER_STATUSES, ORDER_STATUS_LABELS } from "@/constants/order-status";
+import type { OrderDto, OrderStatusValue } from "@/types/order";
+
+export default function AdminOrdersPage() {
+  const [status, setStatus] = useState<OrderStatusValue | "">("");
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<"date" | "price">("date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin", "orders", status, search, sortBy, sortDir],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (status) params.set("status", status);
+      if (search) params.set("search", search);
+      params.set("sortBy", sortBy);
+      params.set("sortDir", sortDir);
+      return apiFetch<{ orders: OrderDto[] }>(`/api/admin/orders?${params.toString()}`);
+    },
+  });
+
+  function toggleSort(field: "date" | "price") {
+    if (sortBy === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(field);
+      setSortDir("desc");
+    }
+  }
+
+  return (
+    <div>
+      <h1 className="mb-6 text-xl font-bold">Orders</h1>
+
+      <div className="mb-4 flex flex-wrap items-end gap-3 text-sm">
+        <div>
+          <label className="mb-1 block text-xs font-medium">Status</label>
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value as OrderStatusValue | "")}
+            className="rounded-md border border-gray-300 px-2 py-1.5"
+          >
+            <option value="">All</option>
+            {ORDER_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {ORDER_STATUS_LABELS[s]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium">Client search</label>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Name or email"
+            className="rounded-md border border-gray-300 px-2 py-1.5"
+          />
+        </div>
+      </div>
+
+      {isLoading ? (
+        <p>Loading…</p>
+      ) : !data || data.orders.length === 0 ? (
+        <p className="text-gray-500">No orders found. Try adjusting your filters.</p>
+      ) : (
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-200 text-left text-gray-500">
+              <th className="py-2">Order</th>
+              <th>Client / Contact</th>
+              <th>Status</th>
+              <th>
+                <button onClick={() => toggleSort("date")} className="hover:underline">
+                  Date {sortBy === "date" && (sortDir === "asc" ? "▲" : "▼")}
+                </button>
+              </th>
+              <th>
+                <button onClick={() => toggleSort("price")} className="hover:underline">
+                  Total {sortBy === "price" && (sortDir === "asc" ? "▲" : "▼")}
+                </button>
+              </th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.orders.map((order) => (
+              <tr key={order.id} className="border-b border-gray-100">
+                <td className="py-2">#{order.id}</td>
+                <td>
+                  {order.contactName}
+                  <div className="text-xs text-gray-500">
+                    {order.userId ? order.contactEmail : `Guest — ${order.contactEmail}`}
+                  </div>
+                </td>
+                <td>
+                  <StatusBadge status={order.status} />
+                </td>
+                <td>{new Date(order.createdAt).toLocaleDateString()}</td>
+                <td>{formatCurrency(order.totalAmount)}</td>
+                <td className="text-right">
+                  <Link href={`/admin/orders/${order.id}`} className="underline">
+                    View
+                  </Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
