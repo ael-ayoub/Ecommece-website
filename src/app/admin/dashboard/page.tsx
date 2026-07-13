@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-client";
 import { KPICard } from "@/components/admin/analytics/KPICard";
@@ -54,7 +55,15 @@ export default function AdminDashboardPage() {
           </div>
 
           <div className="rounded-lg border border-gray-200 p-4">
-            <h2 className="mb-3 font-semibold">Recent Activity</h2>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="font-semibold">Recent Activity</h2>
+              <Link
+                href="/admin/orders"
+                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium hover:bg-gray-50"
+              >
+                See all
+              </Link>
+            </div>
             <RecentOrders orders={summary?.recentOrders ?? []} />
           </div>
         </>

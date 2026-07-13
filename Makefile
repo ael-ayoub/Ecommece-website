@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := all
 
-.PHONY: all seed clean fclean
+.PHONY: all seed clean fclean start dev dev-down
 
 # Build and start the full containerized stack (Postgres + the app). The
 # app image runs `prisma migrate deploy` on startup before serving, so a
@@ -8,6 +8,19 @@
 # `make` does.
 all:
 	docker compose up -d --build
+
+start:
+	docker compose restart -d
+
+# Dev mode: same Postgres container, but the app runs `next dev` against
+# your bind-mounted source (docker-compose.dev.yml) instead of a pre-built
+# image — edits on the host show up immediately, no rebuild needed. Use
+# plain `make`/`make fclean` for the production-style stack instead.
+dev:
+	docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+
+dev-down:
+	docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 
 # Populate the database with sample data, run inside the running app
 # container (admin login comes from ADMIN_EMAIL/ADMIN_PASSWORD in

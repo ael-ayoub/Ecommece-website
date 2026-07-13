@@ -1,11 +1,12 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-client";
 import type { ClientListItemDto } from "@/types/client";
 
 export default function AdminClientsPage() {
+  const router = useRouter();
   const { data, isLoading } = useQuery({
     queryKey: ["admin", "clients"],
     queryFn: () => apiFetch<{ clients: ClientListItemDto[] }>("/api/admin/clients"),
@@ -28,23 +29,21 @@ export default function AdminClientsPage() {
               <th>Phone</th>
               <th>Orders</th>
               <th>Last Order</th>
-              <th></th>
             </tr>
           </thead>
           <tbody>
             {data.clients.map((client) => (
-              <tr key={client.id} className="border-b border-gray-100">
+              <tr
+                key={client.id}
+                onClick={() => router.push(`/admin/clients/${client.id}`)}
+                className="cursor-pointer border-b border-gray-100 hover:bg-gray-50"
+              >
                 <td className="py-2">{client.name}</td>
                 <td>{client.email}</td>
                 <td>{client.phone}</td>
                 <td>{client.orderCount}</td>
                 <td>
                   {client.lastOrderDate ? new Date(client.lastOrderDate).toLocaleDateString() : "—"}
-                </td>
-                <td className="text-right">
-                  <Link href={`/admin/clients/${client.id}`} className="underline">
-                    View Details
-                  </Link>
                 </td>
               </tr>
             ))}

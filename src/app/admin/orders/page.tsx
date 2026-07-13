@@ -1,15 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-client";
-import { StatusBadge } from "@/components/common/StatusBadge";
+import { OrderStatusSelect } from "@/components/admin/orders/OrderStatusSelect";
 import { formatCurrency } from "@/lib/format";
 import { ORDER_STATUSES, ORDER_STATUS_LABELS } from "@/constants/order-status";
 import type { OrderDto, OrderStatusValue } from "@/types/order";
 
 export default function AdminOrdersPage() {
+  const router = useRouter();
   const [status, setStatus] = useState<OrderStatusValue | "">("");
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<"date" | "price">("date");
@@ -77,7 +78,6 @@ export default function AdminOrdersPage() {
             <tr className="border-b border-gray-200 text-left text-gray-500">
               <th className="py-2">Order</th>
               <th>Client / Contact</th>
-              <th>Status</th>
               <th>
                 <button onClick={() => toggleSort("date")} className="hover:underline">
                   Date {sortBy === "date" && (sortDir === "asc" ? "▲" : "▼")}
@@ -88,12 +88,16 @@ export default function AdminOrdersPage() {
                   Total {sortBy === "price" && (sortDir === "asc" ? "▲" : "▼")}
                 </button>
               </th>
-              <th></th>
+              <th className="text-right">Status</th>
             </tr>
           </thead>
           <tbody>
             {data.orders.map((order) => (
-              <tr key={order.id} className="border-b border-gray-100">
+              <tr
+                key={order.id}
+                onClick={() => router.push(`/admin/orders/${order.id}`)}
+                className="cursor-pointer border-b border-gray-100 hover:bg-gray-50"
+              >
                 <td className="py-2">#{order.id}</td>
                 <td>
                   {order.contactName}
@@ -101,15 +105,10 @@ export default function AdminOrdersPage() {
                     {order.userId ? order.contactEmail : `Guest — ${order.contactEmail}`}
                   </div>
                 </td>
-                <td>
-                  <StatusBadge status={order.status} />
-                </td>
                 <td>{new Date(order.createdAt).toLocaleDateString()}</td>
                 <td>{formatCurrency(order.totalAmount)}</td>
                 <td className="text-right">
-                  <Link href={`/admin/orders/${order.id}`} className="underline">
-                    View
-                  </Link>
+                  <OrderStatusSelect orderId={order.id} status={order.status} />
                 </td>
               </tr>
             ))}

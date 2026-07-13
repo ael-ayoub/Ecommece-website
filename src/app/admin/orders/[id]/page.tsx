@@ -9,7 +9,7 @@ import { OrderStatusTimeline } from "@/components/orders/OrderStatusTimeline";
 import { OrderItemsTable } from "@/components/orders/OrderItemsTable";
 import { Button } from "@/components/ui/button";
 import {
-  ADMIN_ORDER_TRANSITIONS,
+  getAdminOrderTransitions,
   ORDER_STATUS_LABELS,
   STOCK_RESTORING_STATUSES,
 } from "@/constants/order-status";
@@ -67,7 +67,7 @@ export default function AdminOrderDetailPage({ params }: Props) {
 
   const { order } = data;
   const restoreUnits = order.items.reduce((sum, item) => sum + (item.variant?.quantity ?? 0), 0);
-  const allowedNext = ADMIN_ORDER_TRANSITIONS[order.status];
+  const allowedNext = getAdminOrderTransitions(order.status);
 
   return (
     <div className="max-w-2xl">

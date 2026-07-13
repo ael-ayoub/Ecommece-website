@@ -39,19 +39,14 @@ export const ORDER_FORWARD_PATH: OrderStatusValue[] = [
   "DELIVERED",
 ];
 
-// Admin transition table — the exact matrix from architecture.md §3.2, not a
-// looser "anything before Delivered" rule. In particular: Cancelled is only
-// reachable from Pending/Confirmed (pre-shipment); Returned is only reachable
-// from Shipped/Delivered (post-shipment) — a shipped order is "returned," not
-// "cancelled." Cancelled and Returned are terminal (empty transition lists).
-export const ADMIN_ORDER_TRANSITIONS: Record<OrderStatusValue, OrderStatusValue[]> = {
-  PENDING: ["CONFIRMED", "CANCELLED"],
-  CONFIRMED: ["SHIPPED", "CANCELLED"],
-  SHIPPED: ["DELIVERED", "RETURNED"],
-  DELIVERED: ["RETURNED"],
-  CANCELLED: [],
-  RETURNED: [],
-};
+// Admin can move an order to any of the six locked statuses from any current
+// status — not restricted to a forward-progression matrix. Only an admin can
+// do this (enforced by requireAdmin() on PUT /admin/orders/:id/status); the
+// service layer keeps stock consistent regardless of which direction the
+// status moves (see updateOrderStatusAsAdmin in order.service.ts).
+export function getAdminOrderTransitions(current: OrderStatusValue): OrderStatusValue[] {
+  return ORDER_STATUSES.filter((s) => s !== current);
+}
 
 // Transitions that restore stock — shared by the UI (to decide whether to
 // show the "this will restore N units" confirmation) and the service layer.

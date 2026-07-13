@@ -1,9 +1,13 @@
 import { db } from "@/lib/db";
 import { Prisma, OrderStatus } from "@prisma/client";
-import { lockAndDecrementStock, restoreStock } from "@/services/inventory.service";
+import {
+  lockAndDecrementStock,
+  restoreStock,
+  decrementStockForReactivation,
+} from "@/services/inventory.service";
 import { notifyOrderChanged } from "@/lib/realtime/notify";
 import { ConflictError, NotFoundError } from "@/lib/errors";
-import { ADMIN_ORDER_TRANSITIONS, STOCK_RESTORING_STATUSES } from "@/constants/order-status";
+import { ORDER_STATUSES, STOCK_RESTORING_STATUSES } from "@/constants/order-status";
 import type { OrderCreateInput } from "@/lib/validators";
 import type { OrderStatusValue } from "@/types/order";
 
@@ -193,12 +197,18 @@ export async function listRecentOrders(limit: number) {
   return db.order.findMany({ orderBy: { createdAt: "desc" }, take: limit, include: orderInclude });
 }
 
-// Admin-driven status change: validates the transition against the exact
-// locked matrix (architecture.md §3.2 — see ADMIN_ORDER_TRANSITIONS), and
-// restores stock atomically when moving into Cancelled or Returned, reusing
-// the same restoreStock() the client's own cancellation uses (one
-// implementation of "how stock comes back," per inventory.service.ts).
+// Admin-driven status change: an admin (and only an admin — enforced by
+// requireAdmin() in the route) can move an order to any of the six locked
+// statuses (architecture.md §3.2) regardless of its current status, not just
+// the forward-progression matrix. Stock is kept consistent either way: moving
+// into Cancelled/Returned restores stock (as before), and moving *out* of
+// Cancelled/Returned back into an active status re-decrements it, so
+// reversing a cancellation/return doesn't silently double-count inventory.
 export async function updateOrderStatusAsAdmin(orderId: number, nextStatus: OrderStatusValue) {
+  if (!ORDER_STATUSES.includes(nextStatus)) {
+    throw new ConflictError(`${nextStatus} is not a valid order status.`);
+  }
+
   const order = await db.$transaction(async (tx) => {
     const locked = await lockOrderForUpdate(tx, orderId);
 
@@ -206,23 +216,36 @@ export async function updateOrderStatusAsAdmin(orderId: number, nextStatus: Orde
       throw new NotFoundError("Order not found.");
     }
 
-    const allowed = ADMIN_ORDER_TRANSITIONS[locked.status as OrderStatusValue];
-    if (!allowed.includes(nextStatus)) {
-      throw new ConflictError(`Cannot move an order from ${locked.status} to ${nextStatus}.`);
-    }
+    const currentStatus = locked.status as OrderStatusValue;
+    if (currentStatus !== nextStatus) {
+      const wasRestored = STOCK_RESTORING_STATUSES.includes(currentStatus);
+      const willBeRestored = STOCK_RESTORING_STATUSES.includes(nextStatus);
 
-    if (STOCK_RESTORING_STATUSES.includes(nextStatus)) {
-      const items = await tx.orderItem.findMany({
-        where: { orderId },
-        include: { variant: true },
-      });
+      if (!wasRestored && willBeRestored) {
+        const items = await tx.orderItem.findMany({
+          where: { orderId },
+          include: { variant: true },
+        });
 
-      const restorable = items
-        .map((item) => item.variant)
-        .filter((v): v is NonNullable<typeof v> => v !== null && v.productVariantId !== null)
-        .map((v) => ({ variantId: v.productVariantId as number, quantity: v.quantity }));
+        const restorable = items
+          .map((item) => item.variant)
+          .filter((v): v is NonNullable<typeof v> => v !== null && v.productVariantId !== null)
+          .map((v) => ({ variantId: v.productVariantId as number, quantity: v.quantity }));
 
-      await restoreStock(tx, restorable);
+        await restoreStock(tx, restorable);
+      } else if (wasRestored && !willBeRestored) {
+        const items = await tx.orderItem.findMany({
+          where: { orderId },
+          include: { variant: true },
+        });
+
+        const reclaimable = items
+          .map((item) => item.variant)
+          .filter((v): v is NonNullable<typeof v> => v !== null && v.productVariantId !== null)
+          .map((v) => ({ variantId: v.productVariantId as number, quantity: v.quantity }));
+
+        await decrementStockForReactivation(tx, reclaimable);
+      }
     }
 
     return tx.order.update({
