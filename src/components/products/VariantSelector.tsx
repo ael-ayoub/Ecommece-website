@@ -2,19 +2,30 @@
 
 import { useMemo, useState } from "react";
 import { formatCurrency } from "@/lib/format";
+import { useCart } from "@/hooks/useCart";
 import type { ProductVariantDto } from "@/types/product";
 
-export function VariantSelector({
-  variants,
-  basePrice,
-}: {
+interface Props {
+  productId: number;
+  productName: string;
+  productImage: string | null;
   variants: ProductVariantDto[];
   basePrice: string;
-}) {
+}
+
+export function VariantSelector({
+  productId,
+  productName,
+  productImage,
+  variants,
+  basePrice,
+}: Props) {
+  const { addItem } = useCart();
   const selectableVariants = variants; // disabled/out-of-stock stay visible but non-selectable
   const firstSelectable = variants.find((v) => v.isActive && v.stockQuantity > 0);
   const [selectedId, setSelectedId] = useState<number | null>(firstSelectable?.id ?? null);
   const [quantity, setQuantity] = useState(1);
+  const [justAdded, setJustAdded] = useState(false);
 
   const selected = useMemo(
     () => selectableVariants.find((v) => v.id === selectedId) ?? null,
@@ -28,6 +39,29 @@ export function VariantSelector({
     if (!v.isActive || v.stockQuantity === 0) return;
     setSelectedId(v.id);
     setQuantity(1);
+    setJustAdded(false);
+  }
+
+  function handleAddToCart() {
+    // Defensive guard mirroring selectVariant's rule — a disabled/out-of-stock
+    // variant can never be `selected` in the first place, but this keeps the
+    // add path itself provably safe even if that invariant ever changes.
+    if (!selected || !selected.isActive || selected.stockQuantity === 0) return;
+
+    addItem(
+      {
+        id: `${productId}:${selected.id}`,
+        productId,
+        productName,
+        productImage,
+        variantId: selected.id,
+        variantLabel: selected.variantLabel,
+        unitPrice: Number((selected.price ?? basePrice).toString()),
+        stockQuantity: selected.stockQuantity,
+      },
+      quantity,
+    );
+    setJustAdded(true);
   }
 
   return (
@@ -83,7 +117,8 @@ export function VariantSelector({
             <span>{quantity}</span>
             <button
               type="button"
-              className="h-8 w-8 rounded border border-gray-300"
+              className="h-8 w-8 rounded border border-gray-300 disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={quantity >= maxQty}
               onClick={() => setQuantity((q) => Math.min(maxQty, q + 1))}
             >
               +
@@ -91,9 +126,10 @@ export function VariantSelector({
           </div>
           <button
             type="button"
+            onClick={handleAddToCart}
             className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
           >
-            Add to Cart
+            {justAdded ? "Added ✓" : "Add to Cart"}
           </button>
         </>
       ) : (

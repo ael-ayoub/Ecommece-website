@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { QueryProvider } from "@/components/providers/QueryProvider";
+import { CartProvider } from "@/components/providers/CartProvider";
 
 export const metadata: Metadata = {
   title: "E-Commerce Platform",
@@ -15,7 +16,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
-        <QueryProvider>{children}</QueryProvider>
+        <QueryProvider>
+          <CartProvider>{children}</CartProvider>
+        </QueryProvider>
       </body>
     </html>
   );

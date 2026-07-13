@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import { useCart } from "@/hooks/useCart";
 
 export function Header() {
   const router = useRouter();
   const { user, isLoading, logout } = useAuth();
+  const { itemCount, hydrated } = useCart();
 
   async function handleLogout() {
     await logout();
@@ -23,6 +25,15 @@ export function Header() {
       <nav className="flex items-center gap-4 text-sm">
         <Link href="/products" className="hover:underline">
           Products
+        </Link>
+
+        <Link href="/cart" className="flex items-center gap-1 hover:underline">
+          🛒 Cart
+          {hydrated && itemCount > 0 && (
+            <span className="rounded-full bg-gray-900 px-1.5 py-0.5 text-xs text-white">
+              {itemCount}
+            </span>
+          )}
         </Link>
 
         {isLoading ? null : user ? (

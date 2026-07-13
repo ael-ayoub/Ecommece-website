@@ -53,7 +53,13 @@ export default async function ProductDetailPage({ params }: Props) {
           <p className="mb-4 text-sm text-gray-600">{anyInStock ? "In stock" : "Out of stock"}</p>
 
           {product.variants.length > 0 ? (
-            <VariantSelector variants={product.variants} basePrice={product.basePrice.toString()} />
+            <VariantSelector
+              productId={product.id}
+              productName={product.name}
+              productImage={product.images[0] ?? null}
+              variants={product.variants}
+              basePrice={product.basePrice.toString()}
+            />
           ) : (
             <p className="text-sm text-red-600">No variants available for this product.</p>
           )}
