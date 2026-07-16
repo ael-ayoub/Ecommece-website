@@ -50,6 +50,7 @@ export interface ProductDto {
   productType: "SIMPLE" | "CONFIGURABLE";
   images: string[];
   isActive: boolean;
+  showExactStock: boolean;
   variants: ProductVariantDto[];
   options: ProductOptionDto[];
   totalStock: number;

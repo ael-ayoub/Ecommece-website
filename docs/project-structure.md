@@ -8,6 +8,13 @@
   derived inventory reads.
 - Prisma ProductOption, ProductOptionValue, and ProductVariantOptionValue models
   provide structured configurable-product options.
+- `src/services/option-template.service.ts` owns template visibility,
+  ownership, category recommendations, preferences, and usage.
+- `/api/admin/option-templates` and `/admin/settings/product-options` expose
+  protected preset management.
+- `/api/products/[id]/variants/batch` performs transactional dirty-row saves
+  from Manage Variants; structured combination creation remains centralized in
+  the Product service.
 
 **Author's note:** this document is written from the perspective of a senior software architect explaining _why_ the codebase is organized the way it is — not just _what_ goes where. It is documentation only; no code lives here. It assumes the tech stack and business rules already locked in [architecture.md](architecture.md), [admin-dashboard-spec.md](admin-dashboard-spec.md), and [client-interface-spec.md](client-interface-spec.md).
 

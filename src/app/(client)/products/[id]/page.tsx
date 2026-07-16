@@ -60,6 +60,7 @@ export default async function ProductDetailPage({ params }: Props) {
               variants={product.variants}
               basePrice={product.basePrice.toString()}
               productType={product.productType}
+              showExactStock={product.showExactStock}
             />
           ) : (
             <p className="text-sm text-red-600">No variants available for this product.</p>

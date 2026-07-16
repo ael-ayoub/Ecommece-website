@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { formatCurrency } from "@/lib/format";
 import { useCart } from "@/hooks/useCart";
 import type { ProductVariantDto } from "@/types/product";
+import { optionValueAvailability } from "@/domain/option-template";
 
 interface Props {
   productId: number;
@@ -12,6 +13,7 @@ interface Props {
   variants: ProductVariantDto[];
   basePrice: string;
   productType: "SIMPLE" | "CONFIGURABLE";
+  showExactStock: boolean;
 }
 
 export function VariantSelector({
@@ -21,20 +23,16 @@ export function VariantSelector({
   variants,
   basePrice,
   productType,
+  showExactStock,
 }: Props) {
   const { addItem } = useCart();
   const selectableVariants = variants; // disabled/out-of-stock stay visible but non-selectable
   const firstSelectable = variants.find((v) => v.isActive && v.stockQuantity > 0);
-  const [selectedId, setSelectedId] = useState<number | null>(firstSelectable?.id ?? null);
   const structured = variants.some((variant) => (variant.optionValues?.length ?? 0) > 0);
-  const [selections, setSelections] = useState<Record<string, string>>(() =>
-    Object.fromEntries(
-      (firstSelectable?.optionValues ?? []).map(({ optionValue }) => [
-        optionValue.option.name,
-        optionValue.value,
-      ]),
-    ),
+  const [selectedId, setSelectedId] = useState<number | null>(
+    productType === "SIMPLE" ? (firstSelectable?.id ?? null) : null,
   );
+  const [selections, setSelections] = useState<Record<string, string>>({});
   const [quantity, setQuantity] = useState(1);
   const [justAdded, setJustAdded] = useState(false);
 
@@ -68,6 +66,7 @@ export function VariantSelector({
       (variant) =>
         variant.isActive &&
         variant.stockQuantity > 0 &&
+        (variant.optionValues?.length ?? 0) === optionDefinitions.length &&
         (variant.optionValues ?? []).every(
           ({ optionValue }) => next[optionValue.option.name] === optionValue.value,
         ),
@@ -116,20 +115,34 @@ export function VariantSelector({
               <p className="mb-1 text-sm font-medium">{option.name}</p>
               <div className="flex flex-wrap gap-2">
                 {option.values.map((value) => {
-                  const possible = variants.some(
-                    (variant) =>
-                      variant.isActive &&
-                      variant.stockQuantity > 0 &&
-                      (variant.optionValues ?? []).some(
-                        ({ optionValue }) =>
-                          optionValue.option.name === option.name && optionValue.value === value,
+                  const availability = optionValueAvailability(
+                    variants.map((variant) => ({
+                      isActive: variant.isActive,
+                      stockQuantity: variant.stockQuantity,
+                      values: Object.fromEntries(
+                        (variant.optionValues ?? []).map(({ optionValue }) => [
+                          optionValue.option.name,
+                          optionValue.value,
+                        ]),
                       ),
+                    })),
+                    selections,
+                    option.name,
+                    value,
                   );
+                  const possible = availability === "AVAILABLE";
                   return (
                     <button
                       key={value}
                       type="button"
                       disabled={!possible}
+                      title={
+                        !possible
+                          ? availability === "OUT_OF_STOCK"
+                            ? "Out of stock"
+                            : "Unavailable"
+                          : undefined
+                      }
                       onClick={() => selectOption(option.name, value)}
                       className={`rounded border px-3 py-1 text-sm ${
                         selections[option.name] === value
@@ -177,7 +190,8 @@ export function VariantSelector({
           </div>
           {selected && (
             <p className="mt-2 text-sm text-gray-600">
-              {selected.variantLabel} — {selected.stockQuantity} left
+              {selected.variantLabel}
+              {showExactStock ? ` — ${selected.stockQuantity} left` : " — Available"}
             </p>
           )}
         </div>
@@ -215,7 +229,11 @@ export function VariantSelector({
           </button>
         </>
       ) : (
-        <p className="text-sm font-medium text-red-600">Out of stock</p>
+        <p className="text-sm font-medium text-red-600">
+          {structured && Object.keys(selections).length < optionDefinitions.length
+            ? "Select all options"
+            : "Out of stock or unavailable"}
+        </p>
       )}
     </div>
   );

@@ -7,6 +7,14 @@ unit is a ProductVariant with a unique SKU, and stock exists only on that SKU.
 Simple Products have one hidden default SKU; configurable Products use
 structured options and exact SKU combinations.
 
+Admins can start configurable Products from read-only built-in option templates
+or personal presets. Templates are copied into Product-owned options and never
+remain a live dependency of an existing Product.
+
+Selecting option values does not generate SKUs. Sellers add only combinations
+they actually offer; each explicit row becomes one ProductVariant with its own
+label, stock, SKU code, and optional price override.
+
 See [docs/architecture.md](docs/architecture.md), [docs/admin-dashboard-spec.md](docs/admin-dashboard-spec.md), [docs/client-interface-spec.md](docs/client-interface-spec.md), and [docs/project-structure.md](docs/project-structure.md) for the full design. This README only covers running the project locally.
 
 **Status:** v1 hardening in progress — critical checkout, inventory, lifecycle,

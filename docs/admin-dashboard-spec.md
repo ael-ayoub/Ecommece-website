@@ -12,6 +12,17 @@ The Product list displays type, SKU count, derived active-SKU stock, price
 range, availability, and active status. Product type cannot be changed through
 normal editing. Historical SKUs are disabled rather than deleted.
 
+The configurable creation flow explicitly activates recommended, pinned,
+recent, common, or custom options and selects valid values. This selection
+creates no SKU. The seller uses one Add combination row to choose one value per
+option, edit the display label, enter SKU stock, and optionally override the base
+price. Only added rows become SKUs; missing combinations are not offered.
+
+Manage Variants uses dirty-row tracking with explicit Discard and transactional
+Save changes actions. Existing combinations retain identity while label, SKU,
+stock, price override, and enabled state are edited. New structured combinations
+start disabled until reviewed.
+
 This is a design document, not an implementation guide. It describes what the admin sees, what data is on screen, how the admin interacts with it, and how real-time updates behave. It complements [architecture.md](architecture.md), which covers the underlying entities, API endpoints, and tech stack — this document focuses purely on the admin-facing experience.
 
 ---

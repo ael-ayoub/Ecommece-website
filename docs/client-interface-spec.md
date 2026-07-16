@@ -11,6 +11,16 @@ when no active SKU has stock.
 The cart stores `productVariantId` and quantity for both Product types.
 Checkout revalidates the exact SKU and ignores browser-provided prices.
 
+Exact quantities are hidden by default. Partial option selections filter the
+remaining exact SKU combinations: active in-stock values remain selectable,
+active zero-stock values show Out of stock, and inactive/impossible values show
+Unavailable. Add to Cart requires one complete purchasable SKU.
+
+The storefront only resolves ProductVariant rows that actually exist. A missing
+Color/Size pair is Unavailable even when both individual values exist elsewhere.
+An existing active row with zero stock is Out of stock. The selected exact SKU
+controls displayed price and the ProductVariant ID stored in the cart.
+
 This is a design document, not an implementation guide. It describes what clients see, how they browse and check out, and the complete journey from landing on the site to a placed order. It complements [architecture.md](architecture.md) (entities, API endpoints, order lifecycle) and [admin-dashboard-spec.md](admin-dashboard-spec.md) (the admin-facing counterpart) — this document covers only the client-facing (guest and logged-in) experience.
 
 ---

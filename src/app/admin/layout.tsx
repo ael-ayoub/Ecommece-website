@@ -33,6 +33,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <Link href="/admin/clients" className="rounded px-2 py-1 hover:bg-gray-100">
             Clients
           </Link>
+          <Link
+            href="/admin/settings/product-options"
+            className="rounded px-2 py-1 hover:bg-gray-100"
+          >
+            Option Presets
+          </Link>
         </nav>
         <Link href="/" className="mt-6 block text-xs text-gray-500 hover:underline">
           ← Back to storefront

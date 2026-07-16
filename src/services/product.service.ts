@@ -6,6 +6,7 @@ import type {
   ProductUpdateInput,
   VariantCreateInput,
   VariantUpdateInput,
+  VariantBatchUpdateInput,
 } from "@/lib/validators";
 import {
   combinationKey,
@@ -14,6 +15,8 @@ import {
   normalizeOptionText,
   normalizeSku,
 } from "@/domain/product";
+import { recordOptionTemplateUsage } from "@/services/option-template.service";
+import { logger } from "@/lib/logger";
 
 const DEFAULT_PAGE_SIZE = 12;
 
@@ -121,9 +124,9 @@ export async function getProductById(id: number, opts: { includeInactive?: boole
   return withDerivedInventory(product);
 }
 
-export async function createProduct(input: ProductCreateInput) {
+export async function createProduct(input: ProductCreateInput, adminUserId?: number) {
   try {
-    return await db.$transaction(async (tx) => {
+    const created = await db.$transaction(async (tx) => {
       if (input.productType === "SIMPLE") {
         const product = await tx.product.create({
           data: {
@@ -133,6 +136,7 @@ export async function createProduct(input: ProductCreateInput) {
             categoryId: input.categoryId,
             images: input.images,
             isActive: input.isActive,
+            showExactStock: input.showExactStock,
             productType: ProductType.SIMPLE,
             variants: {
               create: {
@@ -166,6 +170,15 @@ export async function createProduct(input: ProductCreateInput) {
             normalizeOptionText(value),
           ]),
         );
+        const submittedNames = Object.keys(normalizedValues);
+        if (
+          submittedNames.length !== optionNames.length ||
+          optionNames.some((name) => !Object.prototype.hasOwnProperty.call(normalizedValues, name))
+        ) {
+          throw new ConflictError(
+            "Each explicit SKU must select exactly one value from every Product option and no unknown options.",
+          );
+        }
         const key = combinationKey(normalizedValues, optionNames);
         if (!allowed.has(key) || seen.has(key)) {
           throw new ConflictError(
@@ -183,6 +196,7 @@ export async function createProduct(input: ProductCreateInput) {
           categoryId: input.categoryId,
           images: input.images,
           isActive: input.isActive,
+          showExactStock: input.showExactStock,
           productType: ProductType.CONFIGURABLE,
         },
       });
@@ -213,7 +227,7 @@ export async function createProduct(input: ProductCreateInput) {
           data: {
             productId: product.id,
             sku: normalizeSku(variant.sku),
-            variantLabel: orderedValues.join(" / "),
+            variantLabel: variant.variantLabel?.trim() || orderedValues.join(" / "),
             isDefault: false,
             optionCombinationKey: key,
             price: variant.price == null ? null : variant.price.toFixed(2),
@@ -236,6 +250,15 @@ export async function createProduct(input: ProductCreateInput) {
       if (!created) throw new NotFoundError("Product creation failed.");
       return withDerivedInventory(created);
     });
+    if (input.productType === "CONFIGURABLE" && adminUserId && input.sourceTemplateIds?.length) {
+      await recordOptionTemplateUsage(adminUserId, input.sourceTemplateIds).catch(() => {
+        logger.warn("option_template_usage_update_failed", {
+          productId: created.id,
+          category: "non_critical_usage_tracking",
+        });
+      });
+    }
+    return created;
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       throw new ConflictError("A SKU, option name, or option value is already in use.");
@@ -256,6 +279,7 @@ export async function updateProduct(id: number, input: ProductUpdateInput) {
       ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}),
       ...(input.images !== undefined ? { images: input.images } : {}),
       ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
+      ...(input.showExactStock !== undefined ? { showExactStock: input.showExactStock } : {}),
     },
     include: productInclude,
   });
@@ -275,6 +299,50 @@ export async function addVariant(productId: number, input: VariantCreateInput) {
     throw new ConflictError("Simple product type is immutable and cannot receive another SKU.");
   }
 
+  const optionNames = product.options.map((option) => option.name);
+  if (optionNames.length > 0) {
+    const selected = input.optionValues ?? {};
+    const submittedNames = Object.keys(selected);
+    if (
+      submittedNames.length !== optionNames.length ||
+      optionNames.some((name) => !Object.prototype.hasOwnProperty.call(selected, name))
+    ) {
+      throw new ConflictError(
+        "Select exactly one value from every Product option and no unknown options.",
+      );
+    }
+    const key = combinationKey(selected, optionNames);
+    const valueIds = product.options.map((option) => {
+      const value = option.values.find((candidate) => candidate.value === selected[option.name]);
+      if (!value) throw new ConflictError(`Select one valid value for ${option.name}.`);
+      return value.id;
+    });
+    try {
+      return await db.$transaction(async (tx) => {
+        const variant = await tx.productVariant.create({
+          data: {
+            productId,
+            sku: normalizeSku(input.sku),
+            variantLabel: input.variantLabel,
+            optionCombinationKey: key,
+            isDefault: false,
+            price: input.price !== undefined ? input.price.toFixed(2) : null,
+            stockQuantity: input.stockQuantity,
+            isActive: input.isActive ?? true,
+          },
+        });
+        await tx.productVariantOptionValue.createMany({
+          data: valueIds.map((optionValueId) => ({ variantId: variant.id, optionValueId })),
+        });
+        return variant;
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        throw new ConflictError("This combination or SKU already exists.");
+      }
+      throw error;
+    }
+  }
   return db.productVariant.create({
     data: {
       productId,
@@ -282,9 +350,6 @@ export async function addVariant(productId: number, input: VariantCreateInput) {
       variantLabel: input.variantLabel,
       isDefault: false,
       price: input.price !== undefined ? input.price.toFixed(2) : null,
-      // Stock is set explicitly by the admin at variant-creation time (no
-      // implicit default beyond schema's 0) — consistent with per-variant
-      // stock being admin-managed, per architecture.md §4.
       stockQuantity: input.stockQuantity,
       isActive: input.isActive ?? true,
     },
@@ -311,4 +376,36 @@ export async function updateVariant(
       ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
     },
   });
+}
+
+export async function batchUpdateVariants(productId: number, input: VariantBatchUpdateInput) {
+  const ids = input.updates.map((update) => update.id);
+  const existing = await db.productVariant.findMany({ where: { productId, id: { in: ids } } });
+  if (existing.length !== new Set(ids).size)
+    throw new NotFoundError("One or more SKUs were not found.");
+  try {
+    return await db.$transaction(
+      input.updates.map((update) =>
+        db.productVariant.update({
+          where: { id: update.id, productId },
+          data: {
+            ...(update.sku !== undefined ? { sku: normalizeSku(update.sku) } : {}),
+            ...(update.variantLabel !== undefined
+              ? { variantLabel: update.variantLabel.trim() }
+              : {}),
+            ...(update.stockQuantity !== undefined ? { stockQuantity: update.stockQuantity } : {}),
+            ...(update.price !== undefined
+              ? { price: update.price === null ? null : update.price.toFixed(2) }
+              : {}),
+            ...(update.isActive !== undefined ? { isActive: update.isActive } : {}),
+          },
+        }),
+      ),
+    );
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new ConflictError("A SKU code in this batch is already in use.");
+    }
+    throw error;
+  }
 }

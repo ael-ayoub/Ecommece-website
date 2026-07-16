@@ -14,6 +14,18 @@ SKUs. Cart and checkout always reference ProductVariant. Orders snapshot Product
 name, variant label, SKU, price, and quantity. Product type is immutable in v1.
 Legacy labels are preserved rather than guessed into structured options.
 
+Reusable OptionTemplate records are creation-time presets only. SYSTEM templates
+are read-only; USER templates belong to one admin User. Category recommendation,
+pin, recency, and usage data affect ordering but never activate an option.
+Product creation copies selected values into ProductOption records and then
+records template usage after the Product transaction succeeds.
+
+Configurable SKU creation is explicit rather than Cartesian. ProductOption
+values define the valid vocabulary, but only submitted selection maps create
+ProductVariant rows. Missing combinations mean Not offered; an existing active
+SKU with zero stock means Out of stock. Variant labels are editable presentation
+data, while optionCombinationKey remains the stable combination identity.
+
 ## Production-hardening baseline
 
 Checkout canonicalizes duplicate variant lines, locks variants in ascending ID

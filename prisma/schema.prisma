@@ -46,6 +46,17 @@ enum ProductType {
   CONFIGURABLE
 }
 
+enum OptionTemplateOwnerType {
+  SYSTEM
+  USER
+}
+
+enum OptionInputType {
+  TEXT
+  COLOR
+  NUMBER
+}
+
 // --- User ----------------------------------------------------------------
 // Single identity table for both admins and clients (architecture.md §2.1).
 
@@ -58,8 +69,10 @@ model User {
   role         Role     @default(CLIENT)
   createdAt    DateTime @default(now())
 
-  orders        Order[]
-  statusChanges OrderStatusHistory[]
+  orders                    Order[]
+  statusChanges             OrderStatusHistory[]
+  optionTemplates           OptionTemplate[]
+  optionTemplatePreferences UserOptionTemplatePreference[]
 
   @@index([role])
 }
@@ -74,24 +87,26 @@ model Category {
   slug      String   @unique
   createdAt DateTime @default(now())
 
-  products Product[]
+  products                      Product[]
+  optionTemplateRecommendations OptionTemplateCategory[]
 }
 
 // --- Product ---------------------------------------------------------------
 // architecture.md §2.3 — shared descriptive data; stock/price live on variants.
 
 model Product {
-  id          Int         @id @default(autoincrement())
-  categoryId  Int
-  category    Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  name        String
-  description String
-  basePrice   Decimal     @db.Decimal(10, 2)
-  productType ProductType
-  images      String[]
-  isActive    Boolean     @default(true)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id             Int         @id @default(autoincrement())
+  categoryId     Int
+  category       Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  name           String
+  description    String
+  basePrice      Decimal     @db.Decimal(10, 2)
+  productType    ProductType
+  images         String[]
+  isActive       Boolean     @default(true)
+  showExactStock Boolean     @default(false)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
   variants   ProductVariant[]
   options    ProductOption[]
@@ -167,6 +182,70 @@ model ProductVariantOptionValue {
 
   @@id([variantId, optionValueId])
   @@index([optionValueId])
+}
+
+model OptionTemplate {
+  id             Int                     @id @default(autoincrement())
+  ownerType      OptionTemplateOwnerType
+  ownerUserId    Int?
+  ownerUser      User?                   @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  name           String
+  normalizedName String
+  inputType      OptionInputType         @default(TEXT)
+  description    String?
+  isActive       Boolean                 @default(true)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  values      OptionTemplateValue[]
+  categories  OptionTemplateCategory[]
+  preferences UserOptionTemplatePreference[]
+
+  @@index([ownerType, ownerUserId, isActive])
+  @@index([normalizedName])
+}
+
+model OptionTemplateValue {
+  id              Int            @id @default(autoincrement())
+  templateId      Int
+  template        OptionTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  value           String
+  normalizedValue String
+  metadata        Json?
+  position        Int            @default(0)
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@unique([templateId, normalizedValue])
+  @@index([templateId, position])
+}
+
+model OptionTemplateCategory {
+  templateId Int
+  categoryId Int
+  priority   Int            @default(0)
+  template   OptionTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  category   Category       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([templateId, categoryId])
+  @@index([categoryId, priority])
+}
+
+model UserOptionTemplatePreference {
+  userId     Int
+  templateId Int
+  usageCount Int            @default(0)
+  lastUsedAt DateTime?
+  isPinned   Boolean        @default(false)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template   OptionTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@id([userId, templateId])
+  @@index([userId, isPinned, lastUsedAt])
+  @@index([userId, usageCount])
 }
 
 // --- Order -------------------------------------------------------------------

@@ -3,6 +3,7 @@ import { updateVariant } from "@/services/product.service";
 import { variantUpdateSchema } from "@/lib/validators";
 import { requireAdmin } from "@/lib/guards/require-admin";
 import { handleApiError } from "@/lib/errors";
+import { assertSameOrigin } from "@/lib/security/origin";
 
 interface Params {
   params: { id: string; variantId: string };
@@ -13,6 +14,7 @@ interface Params {
 // of those two admin actions under one resource.
 export async function PUT(req: NextRequest, { params }: Params) {
   try {
+    assertSameOrigin(req);
     await requireAdmin();
     const body = await req.json();
     const input = variantUpdateSchema.parse(body);

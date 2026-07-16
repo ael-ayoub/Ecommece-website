@@ -3,6 +3,7 @@ import { addVariant } from "@/services/product.service";
 import { variantCreateSchema } from "@/lib/validators";
 import { requireAdmin } from "@/lib/guards/require-admin";
 import { handleApiError } from "@/lib/errors";
+import { assertSameOrigin } from "@/lib/security/origin";
 
 interface Params {
   params: { id: string };
@@ -10,6 +11,7 @@ interface Params {
 
 export async function POST(req: NextRequest, { params }: Params) {
   try {
+    assertSameOrigin(req);
     await requireAdmin();
     const body = await req.json();
     const input = variantCreateSchema.parse(body);

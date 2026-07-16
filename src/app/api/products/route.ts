@@ -4,6 +4,7 @@ import { productCreateSchema } from "@/lib/validators";
 import { requireAdmin } from "@/lib/guards/require-admin";
 import { getCurrentUser } from "@/lib/get-current-user";
 import { handleApiError } from "@/lib/errors";
+import { assertSameOrigin } from "@/lib/security/origin";
 
 export async function GET(req: NextRequest) {
   try {
@@ -28,10 +29,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    await requireAdmin();
+    assertSameOrigin(req);
+    const admin = await requireAdmin();
     const body = await req.json();
     const input = productCreateSchema.parse(body);
-    const product = await createProduct(input);
+    const product = await createProduct(input, admin.id);
     return NextResponse.json({ product }, { status: 201 });
   } catch (err) {
     return handleApiError(err);
