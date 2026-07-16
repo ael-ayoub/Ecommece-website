@@ -14,6 +14,7 @@ interface LockedVariantRow {
   productName: string;
   productIsActive: boolean;
   variantLabel: string;
+  sku: string;
   price: Prisma.Decimal | null;
   basePrice: Prisma.Decimal;
   stockQuantity: number;
@@ -25,6 +26,7 @@ export interface OrderLineSnapshot {
   productId: number;
   productNameSnapshot: string;
   variantLabelSnapshot: string;
+  skuSnapshot: string;
   unitPriceSnapshot: string;
   quantity: number;
 }
@@ -50,7 +52,7 @@ export async function lockAndDecrementStock(
 
   const rows = await tx.$queryRaw<LockedVariantRow[]>`
     SELECT v.id, v."productId", p.name AS "productName", p."isActive" AS "productIsActive",
-           v."variantLabel", v.price, p."basePrice", v."stockQuantity", v."isActive"
+           v."variantLabel", v.sku, v.price, p."basePrice", v."stockQuantity", v."isActive"
     FROM "ProductVariant" v
     JOIN "Product" p ON p.id = v."productId"
     WHERE v.id IN (${Prisma.join(variantIds)})
@@ -86,6 +88,7 @@ export async function lockAndDecrementStock(
       productId: row.productId,
       productNameSnapshot: row.productName,
       variantLabelSnapshot: row.variantLabel,
+      skuSnapshot: row.sku,
       unitPriceSnapshot: (row.price ?? row.basePrice).toString(),
       quantity: line.quantity,
     });

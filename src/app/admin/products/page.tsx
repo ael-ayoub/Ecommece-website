@@ -39,9 +39,11 @@ export default function AdminProductsPage() {
           <thead>
             <tr className="border-b border-gray-200 text-left text-gray-500">
               <th className="py-2">Name</th>
+              <th>Type</th>
               <th>Category</th>
               <th>Price</th>
-              <th>Variants</th>
+              <th>SKUs / Stock</th>
+              <th>Availability</th>
               <th>Status</th>
               <th></th>
             </tr>
@@ -50,9 +52,16 @@ export default function AdminProductsPage() {
             {data.products.map((p) => (
               <tr key={p.id} className="border-b border-gray-100">
                 <td className="py-2">{p.name}</td>
+                <td className="capitalize">{p.productType.toLowerCase()}</td>
                 <td>{p.category.name}</td>
-                <td>{formatCurrency(p.basePrice)}</td>
-                <td>{p.variants.length} variants</td>
+                <td>
+                  {p.minPrice !== p.maxPrice ? `${formatCurrency(p.minPrice)} – ` : ""}
+                  {formatCurrency(p.maxPrice)}
+                </td>
+                <td>
+                  {p.skuCount} SKU{p.skuCount === 1 ? "" : "s"} / {p.totalStock} units
+                </td>
+                <td>{p.availability.replaceAll("_", " ").toLowerCase()}</td>
                 <td>
                   <span
                     className={`rounded px-2 py-0.5 text-xs ${

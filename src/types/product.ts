@@ -19,9 +19,25 @@ export interface ProductVariantDto {
   id: number;
   productId: number;
   variantLabel: string;
+  sku: string;
+  isDefault: boolean;
   price: Money | null;
   stockQuantity: number;
   isActive: boolean;
+  optionValues?: {
+    optionValue: {
+      id: number;
+      value: string;
+      option: { id: number; name: string; position: number };
+    };
+  }[];
+}
+
+export interface ProductOptionDto {
+  id: number;
+  name: string;
+  position: number;
+  values: { id: number; value: string; position: number }[];
 }
 
 export interface ProductDto {
@@ -31,9 +47,16 @@ export interface ProductDto {
   name: string;
   description: string;
   basePrice: Money;
+  productType: "SIMPLE" | "CONFIGURABLE";
   images: string[];
   isActive: boolean;
   variants: ProductVariantDto[];
+  options: ProductOptionDto[];
+  totalStock: number;
+  skuCount: number;
+  availability: "AVAILABLE" | "OUT_OF_STOCK" | "UNAVAILABLE";
+  minPrice: string;
+  maxPrice: string;
   createdAt: Timestamp;
 }
 

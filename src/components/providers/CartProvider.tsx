@@ -82,7 +82,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
-      dispatch({ type: "HYDRATE", items: raw ? JSON.parse(raw) : [] });
+      const parsed = raw ? (JSON.parse(raw) as (CartItem & { variantId?: number })[]) : [];
+      dispatch({
+        type: "HYDRATE",
+        items: parsed
+          .map((item) => ({
+            ...item,
+            productVariantId: item.productVariantId ?? item.variantId ?? 0,
+            sku: item.sku ?? "LEGACY",
+          }))
+          .filter((item) => item.productVariantId > 0),
+      });
     } catch {
       dispatch({ type: "HYDRATE", items: [] });
     }

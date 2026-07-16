@@ -1,5 +1,19 @@
 # E-Commerce Platform — Architecture Overview (v1)
 
+## Product, SKU, and inventory model
+
+Product owns descriptive data and immutable `productType`; it has no stock
+column. ProductVariant is the exact purchasable SKU and owns its normalized SKU
+code, optional price override, active state, and stock. Effective price is the
+variant override when present, otherwise Product base price.
+
+A SIMPLE Product has one hidden default SKU. A CONFIGURABLE Product uses ordered
+ProductOption and ProductOptionValue records, with each new SKU linked to one
+value from each option. Total stock and price ranges are derived from active
+SKUs. Cart and checkout always reference ProductVariant. Orders snapshot Product
+name, variant label, SKU, price, and quantity. Product type is immutable in v1.
+Legacy labels are preserved rather than guessed into structured options.
+
 ## Production-hardening baseline
 
 Checkout canonicalizes duplicate variant lines, locks variants in ascending ID

@@ -70,7 +70,10 @@ export default function CheckoutPage() {
           contactEmail,
           contactPhone,
           shippingAddress,
-          items: items.map((i) => ({ variantId: i.variantId, quantity: i.quantity })),
+          items: items.map((i) => ({
+            variantId: i.productVariantId,
+            quantity: i.quantity,
+          })),
         }),
       });
 

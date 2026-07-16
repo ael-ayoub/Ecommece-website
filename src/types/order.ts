@@ -9,6 +9,7 @@ export type OrderStatusValue =
 export interface OrderItemVariantDto {
   id: number;
   variantLabelSnapshot: string;
+  skuSnapshot: string;
   unitPriceSnapshot: Money;
   quantity: number;
   productVariant: { id: number; isActive: boolean } | null;

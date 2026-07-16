@@ -2,7 +2,7 @@
 // Run with: npm run prisma:seed
 // Wipes and re-seeds every table it touches, so it's safe to re-run.
 
-import { PrismaClient, Role, OrderStatus } from "@prisma/client";
+import { PrismaClient, Role, OrderStatus, ProductType } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const db = new PrismaClient();
@@ -12,6 +12,9 @@ async function main() {
   await db.orderItemVariant.deleteMany();
   await db.orderItem.deleteMany();
   await db.order.deleteMany();
+  await db.productVariantOptionValue.deleteMany();
+  await db.productOptionValue.deleteMany();
+  await db.productOption.deleteMany();
   await db.productVariant.deleteMany();
   await db.product.deleteMany();
   await db.category.deleteMany();
@@ -78,12 +81,13 @@ async function main() {
       name: "Red T-Shirt",
       description: "100% cotton crew-neck T-shirt, machine washable, true to size.",
       basePrice: "15.00",
+      productType: ProductType.CONFIGURABLE,
       images: ["https://res.cloudinary.com/demo/image/upload/red-tshirt.jpg"],
       variants: {
         create: [
-          { variantLabel: "Small", stockQuantity: 12, isActive: true },
-          { variantLabel: "Medium", stockQuantity: 8, isActive: true },
-          { variantLabel: "Large", stockQuantity: 0, isActive: true }, // zero-stock example
+          { sku: "TSHIRT-S", variantLabel: "Small", stockQuantity: 12, isActive: true },
+          { sku: "TSHIRT-M", variantLabel: "Medium", stockQuantity: 8, isActive: true },
+          { sku: "TSHIRT-L", variantLabel: "Large", stockQuantity: 0, isActive: true },
         ],
       },
     },
@@ -95,12 +99,13 @@ async function main() {
       name: "Blue Jeans",
       description: "Straight-fit denim jeans with a mid-rise waist.",
       basePrice: "40.00",
+      productType: ProductType.CONFIGURABLE,
       images: ["https://res.cloudinary.com/demo/image/upload/blue-jeans.jpg"],
       variants: {
         create: [
-          { variantLabel: "30", stockQuantity: 6, isActive: true },
-          { variantLabel: "32", stockQuantity: 9, isActive: true },
-          { variantLabel: "34", stockQuantity: 4, isActive: false }, // disabled example
+          { sku: "JEANS-30", variantLabel: "30", stockQuantity: 6, isActive: true },
+          { sku: "JEANS-32", variantLabel: "32", stockQuantity: 9, isActive: true },
+          { sku: "JEANS-34", variantLabel: "34", stockQuantity: 4, isActive: false },
         ],
       },
     },
@@ -112,11 +117,12 @@ async function main() {
       name: "Wireless Mouse",
       description: "2.4GHz wireless mouse with adjustable DPI and USB receiver.",
       basePrice: "22.50",
+      productType: ProductType.CONFIGURABLE,
       images: ["https://res.cloudinary.com/demo/image/upload/wireless-mouse.jpg"],
       variants: {
         create: [
-          { variantLabel: "Black", stockQuantity: 25, isActive: true },
-          { variantLabel: "White", stockQuantity: 14, isActive: true },
+          { sku: "MOUSE-BLACK", variantLabel: "Black", stockQuantity: 25, isActive: true },
+          { sku: "MOUSE-WHITE", variantLabel: "White", stockQuantity: 14, isActive: true },
         ],
       },
     },
@@ -128,9 +134,18 @@ async function main() {
       name: "Bluetooth Speaker",
       description: "Portable speaker with 10-hour battery life and water resistance.",
       basePrice: "34.99",
+      productType: ProductType.SIMPLE,
       images: ["https://res.cloudinary.com/demo/image/upload/bt-speaker.jpg"],
       variants: {
-        create: [{ variantLabel: "Standard", stockQuantity: 18, isActive: true }],
+        create: [
+          {
+            sku: "SPEAKER-001",
+            variantLabel: "Default",
+            isDefault: true,
+            stockQuantity: 18,
+            isActive: true,
+          },
+        ],
       },
     },
   });
@@ -141,9 +156,18 @@ async function main() {
       name: "Blue Mug",
       description: "12oz ceramic mug, dishwasher and microwave safe.",
       basePrice: "8.00",
+      productType: ProductType.SIMPLE,
       images: ["https://res.cloudinary.com/demo/image/upload/blue-mug.jpg"],
       variants: {
-        create: [{ variantLabel: "Standard", stockQuantity: 40, isActive: true }],
+        create: [
+          {
+            sku: "MUG-BLUE-001",
+            variantLabel: "Default",
+            isDefault: true,
+            stockQuantity: 40,
+            isActive: true,
+          },
+        ],
       },
     },
     include: { variants: true },
@@ -166,7 +190,7 @@ async function main() {
   const redMedium = redTShirtVariants.find((v) => v.variantLabel === "Medium")!;
   const jeans32 = blueJeansVariants.find((v) => v.variantLabel === "32")!;
   const mouseBlack = mouseVariants.find((v) => v.variantLabel === "Black")!;
-  const speakerStandard = speakerVariants.find((v) => v.variantLabel === "Standard")!;
+  const speakerStandard = speakerVariants.find((v) => v.isDefault)!;
 
   // --- Orders ------------------------------------------------------------
   // Helper to create an order + its single item + variant snapshot in one go.
@@ -178,7 +202,13 @@ async function main() {
     shippingAddress: string;
     status: OrderStatus;
     product: { id: number; name: string };
-    variant: { id: number; variantLabel: string; price: unknown; stockQuantity: number };
+    variant: {
+      id: number;
+      sku: string;
+      variantLabel: string;
+      price: unknown;
+      stockQuantity: number;
+    };
     basePrice: string;
     quantity: number;
   }) {
@@ -205,6 +235,7 @@ async function main() {
                 create: {
                   productVariantId: params.variant.id,
                   variantLabelSnapshot: params.variant.variantLabel,
+                  skuSnapshot: params.variant.sku,
                   unitPriceSnapshot: unitPrice as string,
                   quantity: params.quantity,
                 },

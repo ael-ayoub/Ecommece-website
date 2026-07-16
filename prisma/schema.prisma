@@ -41,6 +41,11 @@ enum OrderActorType {
   SYSTEM
 }
 
+enum ProductType {
+  SIMPLE
+  CONFIGURABLE
+}
+
 // --- User ----------------------------------------------------------------
 // Single identity table for both admins and clients (architecture.md §2.1).
 
@@ -53,7 +58,7 @@ model User {
   role         Role     @default(CLIENT)
   createdAt    DateTime @default(now())
 
-  orders Order[]
+  orders        Order[]
   statusChanges OrderStatusHistory[]
 
   @@index([role])
@@ -76,18 +81,20 @@ model Category {
 // architecture.md §2.3 — shared descriptive data; stock/price live on variants.
 
 model Product {
-  id          Int      @id @default(autoincrement())
+  id          Int         @id @default(autoincrement())
   categoryId  Int
-  category    Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  category    Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   name        String
   description String
-  basePrice   Decimal  @db.Decimal(10, 2)
+  basePrice   Decimal     @db.Decimal(10, 2)
+  productType ProductType
   images      String[]
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
   variants   ProductVariant[]
+  options    ProductOption[]
   orderItems OrderItem[]
 
   @@index([categoryId])
@@ -102,21 +109,64 @@ model Product {
 // as a database-level safety net if a Product row is ever truly removed.
 
 model ProductVariant {
-  id            Int      @id @default(autoincrement())
-  productId     Int
-  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  variantLabel  String
-  price         Decimal? @db.Decimal(10, 2)
-  stockQuantity Int      @default(0)
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                   Int      @id @default(autoincrement())
+  productId            Int
+  product              Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantLabel         String
+  sku                  String   @unique
+  isDefault            Boolean  @default(false)
+  optionCombinationKey String?
+  price                Decimal? @db.Decimal(10, 2)
+  stockQuantity        Int      @default(0)
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   orderItemVariants OrderItemVariant[]
+  optionValues      ProductVariantOptionValue[]
 
   @@unique([productId, variantLabel])
+  @@unique([productId, optionCombinationKey])
   @@index([productId])
   @@index([isActive])
+}
+
+model ProductOption {
+  id        Int      @id @default(autoincrement())
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  name      String
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  values ProductOptionValue[]
+
+  @@unique([productId, name])
+  @@index([productId, position])
+}
+
+model ProductOptionValue {
+  id        Int           @id @default(autoincrement())
+  optionId  Int
+  option    ProductOption @relation(fields: [optionId], references: [id], onDelete: Restrict)
+  value     String
+  position  Int           @default(0)
+  createdAt DateTime      @default(now())
+
+  variants ProductVariantOptionValue[]
+
+  @@unique([optionId, value])
+  @@index([optionId, position])
+}
+
+model ProductVariantOptionValue {
+  variantId     Int
+  optionValueId Int
+  variant       ProductVariant     @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  optionValue   ProductOptionValue @relation(fields: [optionValueId], references: [id], onDelete: Restrict)
+
+  @@id([variantId, optionValueId])
+  @@index([optionValueId])
 }
 
 // --- Order -------------------------------------------------------------------
@@ -132,21 +182,21 @@ model ProductVariant {
 // for architecture.md to be updated to match.
 
 model Order {
-  id               Int         @id @default(autoincrement())
-  userId           Int?
-  user             User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
-  contactName      String
-  contactEmail     String
-  contactPhone     String
-  shippingAddress  String
-  status           OrderStatus @default(PENDING)
-  totalAmount      Decimal     @db.Decimal(10, 2)
-  idempotencyKey   String      @unique
+  id                     Int         @id @default(autoincrement())
+  userId                 Int?
+  user                   User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  contactName            String
+  contactEmail           String
+  contactPhone           String
+  shippingAddress        String
+  status                 OrderStatus @default(PENDING)
+  totalAmount            Decimal     @db.Decimal(10, 2)
+  idempotencyKey         String      @unique
   idempotencyFingerprint String
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
 
-  items OrderItem[]
+  items         OrderItem[]
   statusHistory OrderStatusHistory[]
 
   @@index([userId])
@@ -216,14 +266,15 @@ model OrderItem {
 }
 
 model OrderItemVariant {
-  id                    Int             @id @default(autoincrement())
-  orderItemId           Int             @unique
-  orderItem             OrderItem       @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
-  productVariantId      Int?
-  productVariant        ProductVariant? @relation(fields: [productVariantId], references: [id], onDelete: SetNull)
-  variantLabelSnapshot  String
-  unitPriceSnapshot     Decimal         @db.Decimal(10, 2)
-  quantity              Int
+  id                   Int             @id @default(autoincrement())
+  orderItemId          Int             @unique
+  orderItem            OrderItem       @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  productVariantId     Int?
+  productVariant       ProductVariant? @relation(fields: [productVariantId], references: [id], onDelete: SetNull)
+  variantLabelSnapshot String
+  skuSnapshot          String
+  unitPriceSnapshot    Decimal         @db.Decimal(10, 2)
+  quantity             Int
 
   @@index([productVariantId])
 }

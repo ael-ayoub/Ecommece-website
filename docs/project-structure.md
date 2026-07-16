@@ -1,5 +1,14 @@
 # Project Structure & Architecture — E-Commerce Platform v1
 
+## SKU domain additions
+
+- `src/domain/product.ts` contains SKU normalization, effective pricing, and
+  option-combination helpers.
+- `src/services/product.service.ts` owns atomic Product/options/SKU creation and
+  derived inventory reads.
+- Prisma ProductOption, ProductOptionValue, and ProductVariantOptionValue models
+  provide structured configurable-product options.
+
 **Author's note:** this document is written from the perspective of a senior software architect explaining _why_ the codebase is organized the way it is — not just _what_ goes where. It is documentation only; no code lives here. It assumes the tech stack and business rules already locked in [architecture.md](architecture.md), [admin-dashboard-spec.md](admin-dashboard-spec.md), and [client-interface-spec.md](client-interface-spec.md).
 
 ---

@@ -1,5 +1,17 @@
 # Admin Dashboard Specification — E-Commerce Platform v1
 
+## Product inventory workflow
+
+Product creation requires Simple or Configurable selection. Simple Products
+collect one SKU and stock quantity and atomically create a hidden default SKU.
+Configurable Products collect ordered option names/values and generate SKU
+combinations. SKU codes are uppercase, globally unique, at most 64 characters,
+and limited to letters, numbers, hyphens, and underscores.
+
+The Product list displays type, SKU count, derived active-SKU stock, price
+range, availability, and active status. Product type cannot be changed through
+normal editing. Historical SKUs are disabled rather than deleted.
+
 This is a design document, not an implementation guide. It describes what the admin sees, what data is on screen, how the admin interacts with it, and how real-time updates behave. It complements [architecture.md](architecture.md), which covers the underlying entities, API endpoints, and tech stack — this document focuses purely on the admin-facing experience.
 
 ---

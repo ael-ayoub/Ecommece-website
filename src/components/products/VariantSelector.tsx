@@ -11,6 +11,7 @@ interface Props {
   productImage: string | null;
   variants: ProductVariantDto[];
   basePrice: string;
+  productType: "SIMPLE" | "CONFIGURABLE";
 }
 
 export function VariantSelector({
@@ -19,11 +20,21 @@ export function VariantSelector({
   productImage,
   variants,
   basePrice,
+  productType,
 }: Props) {
   const { addItem } = useCart();
   const selectableVariants = variants; // disabled/out-of-stock stay visible but non-selectable
   const firstSelectable = variants.find((v) => v.isActive && v.stockQuantity > 0);
   const [selectedId, setSelectedId] = useState<number | null>(firstSelectable?.id ?? null);
+  const structured = variants.some((variant) => (variant.optionValues?.length ?? 0) > 0);
+  const [selections, setSelections] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      (firstSelectable?.optionValues ?? []).map(({ optionValue }) => [
+        optionValue.option.name,
+        optionValue.value,
+      ]),
+    ),
+  );
   const [quantity, setQuantity] = useState(1);
   const [justAdded, setJustAdded] = useState(false);
 
@@ -34,6 +45,37 @@ export function VariantSelector({
 
   const price = selected?.price ?? basePrice;
   const maxQty = selected?.stockQuantity ?? 0;
+  const optionDefinitions = useMemo(() => {
+    const values = new Map<string, Set<string>>();
+    for (const variant of variants) {
+      for (const link of variant.optionValues ?? []) {
+        const name = link.optionValue.option.name;
+        const current = values.get(name) ?? new Set<string>();
+        current.add(link.optionValue.value);
+        values.set(name, current);
+      }
+    }
+    return Array.from(values.entries()).map(([name, optionValues]) => ({
+      name,
+      values: Array.from(optionValues),
+    }));
+  }, [variants]);
+
+  function selectOption(name: string, value: string) {
+    const next = { ...selections, [name]: value };
+    setSelections(next);
+    const match = variants.find(
+      (variant) =>
+        variant.isActive &&
+        variant.stockQuantity > 0 &&
+        (variant.optionValues ?? []).every(
+          ({ optionValue }) => next[optionValue.option.name] === optionValue.value,
+        ),
+    );
+    setSelectedId(match?.id ?? null);
+    setQuantity(1);
+    setJustAdded(false);
+  }
 
   function selectVariant(v: ProductVariantDto) {
     if (!v.isActive || v.stockQuantity === 0) return;
@@ -54,7 +96,8 @@ export function VariantSelector({
         productId,
         productName,
         productImage,
-        variantId: selected.id,
+        productVariantId: selected.id,
+        sku: selected.sku,
         variantLabel: selected.variantLabel,
         unitPrice: Number((selected.price ?? basePrice).toString()),
         stockQuantity: selected.stockQuantity,
@@ -66,40 +109,79 @@ export function VariantSelector({
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <p className="mb-2 text-sm font-medium">Variant</p>
-        <div className="flex flex-wrap gap-2">
-          {variants.map((v) => {
-            const disabled = !v.isActive || v.stockQuantity === 0;
-            const active = v.id === selectedId;
-            return (
-              <button
-                key={v.id}
-                type="button"
-                disabled={disabled}
-                onClick={() => selectVariant(v)}
-                title={
-                  !v.isActive ? "Unavailable" : v.stockQuantity === 0 ? "Out of stock" : undefined
-                }
-                className={`rounded-md border px-3 py-1.5 text-sm ${
-                  disabled
-                    ? "cursor-not-allowed border-gray-200 text-gray-300 line-through"
-                    : active
-                      ? "border-gray-900 bg-gray-900 text-white"
-                      : "border-gray-300 hover:border-gray-500"
-                }`}
-              >
-                {v.variantLabel}
-              </button>
-            );
-          })}
+      {productType === "CONFIGURABLE" && structured && (
+        <div className="space-y-3">
+          {optionDefinitions.map((option) => (
+            <div key={option.name}>
+              <p className="mb-1 text-sm font-medium">{option.name}</p>
+              <div className="flex flex-wrap gap-2">
+                {option.values.map((value) => {
+                  const possible = variants.some(
+                    (variant) =>
+                      variant.isActive &&
+                      variant.stockQuantity > 0 &&
+                      (variant.optionValues ?? []).some(
+                        ({ optionValue }) =>
+                          optionValue.option.name === option.name && optionValue.value === value,
+                      ),
+                  );
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      disabled={!possible}
+                      onClick={() => selectOption(option.name, value)}
+                      className={`rounded border px-3 py-1 text-sm ${
+                        selections[option.name] === value
+                          ? "border-gray-900 bg-gray-900 text-white"
+                          : "border-gray-300"
+                      } disabled:cursor-not-allowed disabled:opacity-40`}
+                    >
+                      {value}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
-        {selected && (
-          <p className="mt-2 text-sm text-gray-600">
-            {selected.variantLabel} — {selected.stockQuantity} left
-          </p>
-        )}
-      </div>
+      )}
+      {productType === "CONFIGURABLE" && !structured && (
+        <div>
+          <p className="mb-2 text-sm font-medium">Variant</p>
+          <div className="flex flex-wrap gap-2">
+            {variants.map((v) => {
+              const disabled = !v.isActive || v.stockQuantity === 0;
+              const active = v.id === selectedId;
+              return (
+                <button
+                  key={v.id}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => selectVariant(v)}
+                  title={
+                    !v.isActive ? "Unavailable" : v.stockQuantity === 0 ? "Out of stock" : undefined
+                  }
+                  className={`rounded-md border px-3 py-1.5 text-sm ${
+                    disabled
+                      ? "cursor-not-allowed border-gray-200 text-gray-300 line-through"
+                      : active
+                        ? "border-gray-900 bg-gray-900 text-white"
+                        : "border-gray-300 hover:border-gray-500"
+                  }`}
+                >
+                  {v.variantLabel}
+                </button>
+              );
+            })}
+          </div>
+          {selected && (
+            <p className="mt-2 text-sm text-gray-600">
+              {selected.variantLabel} — {selected.stockQuantity} left
+            </p>
+          )}
+        </div>
+      )}
 
       <p className="text-2xl font-bold">{formatCurrency(price)}</p>
 

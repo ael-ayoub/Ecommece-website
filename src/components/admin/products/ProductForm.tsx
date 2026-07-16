@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FieldError } from "@/components/ui/field-error";
 import type { CategoryDto, ProductDto } from "@/types/product";
+import { generateOptionCombinations } from "@/domain/product";
 
 interface Props {
   product?: ProductDto;
@@ -28,6 +29,25 @@ export function ProductForm({ product }: Props) {
   const [categoryId, setCategoryId] = useState(
     product?.categoryId ? String(product.categoryId) : "",
   );
+  const [productType, setProductType] = useState<"SIMPLE" | "CONFIGURABLE">(
+    product?.productType ?? "SIMPLE",
+  );
+  const [sku, setSku] = useState(product?.variants[0]?.sku ?? "");
+  const [stock, setStock] = useState(String(product?.variants[0]?.stockQuantity ?? 0));
+  const [optionRows, setOptionRows] = useState([
+    { name: "Color", values: "Red, Blue" },
+    { name: "Size", values: "Small, Medium" },
+  ]);
+  const options = optionRows
+    .map((row) => ({
+      name: row.name.trim(),
+      values: row.values
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean),
+    }))
+    .filter((option) => option.name && option.values.length);
+  const combinations = generateOptionCombinations(options);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -38,6 +58,10 @@ export function ProductForm({ product }: Props) {
     if (!description.trim()) next.description = "Description is required";
     if (!basePrice || Number(basePrice) <= 0) next.basePrice = "Price must be greater than 0";
     if (!categoryId) next.categoryId = "Category is required";
+    if (!isEdit && productType === "SIMPLE" && !sku.trim()) next.sku = "SKU is required";
+    if (!isEdit && productType === "CONFIGURABLE" && combinations.length === 0) {
+      next.options = "At least one option and value is required";
+    }
     setErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -62,7 +86,29 @@ export function ProductForm({ product }: Props) {
           body: JSON.stringify(payload),
         });
       } else {
-        await apiFetch("/api/products", { method: "POST", body: JSON.stringify(payload) });
+        const createPayload =
+          productType === "SIMPLE"
+            ? {
+                ...payload,
+                productType,
+                sku: { code: sku, stockQuantity: Number(stock), isActive: true },
+              }
+            : {
+                ...payload,
+                productType,
+                options,
+                variants: combinations.map((optionValues, index) => ({
+                  sku: `${name}-${Object.values(optionValues).join("-")}`
+                    .replace(/[^a-z0-9-]/gi, "-")
+                    .toUpperCase(),
+                  optionValues,
+                  price: null,
+                  stockQuantity: 0,
+                  isActive: true,
+                  _row: index,
+                })),
+              };
+        await apiFetch("/api/products", { method: "POST", body: JSON.stringify(createPayload) });
       }
 
       router.push("/admin/products");
@@ -85,6 +131,91 @@ export function ProductForm({ product }: Props) {
         <Input value={name} onChange={(e) => setName(e.target.value)} required />
         <FieldError message={errors.name} />
       </div>
+
+      {!isEdit && (
+        <div>
+          <p className="mb-2 text-sm font-medium">Inventory type *</p>
+          <label className="mr-4 text-sm">
+            <input
+              type="radio"
+              checked={productType === "SIMPLE"}
+              onChange={() => setProductType("SIMPLE")}
+            />{" "}
+            Simple product
+          </label>
+          <label className="text-sm">
+            <input
+              type="radio"
+              checked={productType === "CONFIGURABLE"}
+              onChange={() => setProductType("CONFIGURABLE")}
+            />{" "}
+            Product with variants
+          </label>
+        </div>
+      )}
+
+      {!isEdit && productType === "SIMPLE" && (
+        <>
+          <div>
+            <label className="mb-1 block text-sm font-medium">SKU code *</label>
+            <Input value={sku} onChange={(e) => setSku(e.target.value.toUpperCase())} />
+            <FieldError message={errors.sku} />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">Stock quantity *</label>
+            <Input type="number" min="0" value={stock} onChange={(e) => setStock(e.target.value)} />
+          </div>
+        </>
+      )}
+
+      {!isEdit && productType === "CONFIGURABLE" && (
+        <div className="space-y-3 rounded border border-gray-200 p-3">
+          <p className="text-sm font-medium">Options and SKU combinations</p>
+          {optionRows.map((row, index) => (
+            <div key={index} className="grid grid-cols-2 gap-2">
+              <Input
+                value={row.name}
+                placeholder="Option name"
+                onChange={(e) =>
+                  setOptionRows((rows) =>
+                    rows.map((item, rowIndex) =>
+                      rowIndex === index ? { ...item, name: e.target.value } : item,
+                    ),
+                  )
+                }
+              />
+              <Input
+                value={row.values}
+                placeholder="Comma-separated values"
+                onChange={(e) =>
+                  setOptionRows((rows) =>
+                    rows.map((item, rowIndex) =>
+                      rowIndex === index ? { ...item, values: e.target.value } : item,
+                    ),
+                  )
+                }
+              />
+            </div>
+          ))}
+          <Button
+            type="button"
+            onClick={() => setOptionRows((rows) => [...rows, { name: "", values: "" }])}
+          >
+            + Add option
+          </Button>
+          <p className="text-xs text-gray-500">
+            {combinations.length} combinations will be generated with editable SKU inventory on the
+            Manage Variants page after creation.
+          </p>
+          <FieldError message={errors.options} />
+        </div>
+      )}
+
+      {isEdit && (
+        <p className="text-xs text-gray-500">
+          Product type is immutable in v1. Manage SKU codes and stock from the inventory page.
+        </p>
+      )}
 
       <div>
         <label className="mb-1 block text-sm font-medium">Description *</label>

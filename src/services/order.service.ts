@@ -86,6 +86,7 @@ export async function createOrder(
                 create: {
                   productVariantId: line.variantId,
                   variantLabelSnapshot: line.variantLabelSnapshot,
+                  skuSnapshot: line.skuSnapshot,
                   unitPriceSnapshot: line.unitPriceSnapshot,
                   quantity: line.quantity,
                 },

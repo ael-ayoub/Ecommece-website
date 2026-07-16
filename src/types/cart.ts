@@ -9,7 +9,8 @@ export interface CartItem {
   productId: number;
   productName: string;
   productImage: string | null;
-  variantId: number;
+  productVariantId: number;
+  sku: string;
   variantLabel: string;
   /** Unit price at add-to-cart time, as a plain number for arithmetic. */
   unitPrice: number;

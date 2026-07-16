@@ -2,6 +2,11 @@
 
 Cash-on-Delivery marketplace — Next.js 14 (App Router, TypeScript), PostgreSQL + Prisma, JWT auth.
 
+Inventory is SKU-first: Products contain descriptive data, every purchasable
+unit is a ProductVariant with a unique SKU, and stock exists only on that SKU.
+Simple Products have one hidden default SKU; configurable Products use
+structured options and exact SKU combinations.
+
 See [docs/architecture.md](docs/architecture.md), [docs/admin-dashboard-spec.md](docs/admin-dashboard-spec.md), [docs/client-interface-spec.md](docs/client-interface-spec.md), and [docs/project-structure.md](docs/project-structure.md) for the full design. This README only covers running the project locally.
 
 **Status:** v1 hardening in progress — critical checkout, inventory, lifecycle,

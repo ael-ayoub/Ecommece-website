@@ -1,5 +1,16 @@
 # Client Interface Specification — E-Commerce Platform v1
 
+## SKU selection and availability
+
+Simple Products hide the variant selector and automatically add their default
+SKU. Configurable Products expose structured option choices and resolve a
+complete selection to one active, in-stock SKU. Price and quantity limits follow
+that SKU. Cards show `From` when effective SKU prices differ and Out of Stock
+when no active SKU has stock.
+
+The cart stores `productVariantId` and quantity for both Product types.
+Checkout revalidates the exact SKU and ignores browser-provided prices.
+
 This is a design document, not an implementation guide. It describes what clients see, how they browse and check out, and the complete journey from landing on the site to a placed order. It complements [architecture.md](architecture.md) (entities, API endpoints, order lifecycle) and [admin-dashboard-spec.md](admin-dashboard-spec.md) (the admin-facing counterpart) — this document covers only the client-facing (guest and logged-in) experience.
 
 ---

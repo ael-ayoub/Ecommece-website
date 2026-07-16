@@ -14,7 +14,7 @@ export function OrderItemsTable({
       <thead>
         <tr className="border-b border-gray-200 text-left text-gray-500">
           <th className="py-2">Product</th>
-          <th>Variant</th>
+          <th>SKU / Variant</th>
           <th>Qty</th>
           <th>Unit Price</th>
           <th>Subtotal</th>
@@ -27,7 +27,11 @@ export function OrderItemsTable({
           return (
             <tr key={item.id} className="border-b border-gray-100">
               <td className="py-2">{item.productNameSnapshot}</td>
-              <td>{item.variant?.variantLabelSnapshot ?? "—"}</td>
+              <td>
+                {item.variant
+                  ? `${item.variant.skuSnapshot} / ${item.variant.variantLabelSnapshot}`
+                  : "—"}
+              </td>
               <td>{qty}</td>
               <td>{formatCurrency(unitPrice)}</td>
               <td className="font-medium">{formatCurrency(Number(unitPrice.toString()) * qty)}</td>

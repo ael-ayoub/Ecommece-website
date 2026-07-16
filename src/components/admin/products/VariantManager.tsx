@@ -21,6 +21,7 @@ export function VariantManager({ productId }: { productId: number }) {
   });
 
   const [label, setLabel] = useState("");
+  const [sku, setSku] = useState("");
   const [stock, setStock] = useState("0");
   const [price, setPrice] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -33,8 +34,8 @@ export function VariantManager({ productId }: { productId: number }) {
   async function handleAdd(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!label.trim()) {
-      setError("Variant label is required.");
+    if (!label.trim() || !sku.trim()) {
+      setError("SKU and variant label are required.");
       return;
     }
     setSubmitting(true);
@@ -43,11 +44,13 @@ export function VariantManager({ productId }: { productId: number }) {
         method: "POST",
         body: JSON.stringify({
           variantLabel: label,
+          sku,
           stockQuantity: Number(stock) || 0,
           ...(price ? { price: Number(price) } : {}),
         }),
       });
       setLabel("");
+      setSku("");
       setStock("0");
       setPrice("");
       invalidate();
@@ -83,6 +86,7 @@ export function VariantManager({ productId }: { productId: number }) {
           <thead>
             <tr className="border-b border-gray-200 text-left text-gray-500">
               <th className="py-2">Variant</th>
+              <th>SKU</th>
               <th>Stock</th>
               <th>Enabled</th>
             </tr>
@@ -91,6 +95,7 @@ export function VariantManager({ productId }: { productId: number }) {
             {variants?.map((v) => (
               <tr key={v.id} className="border-b border-gray-100">
                 <td className="py-2">{v.variantLabel}</td>
+                <td>{v.sku}</td>
                 <td>
                   <input
                     type="number"
@@ -115,6 +120,14 @@ export function VariantManager({ productId }: { productId: number }) {
       )}
 
       <form onSubmit={handleAdd} className="mt-6 flex flex-wrap items-end gap-2">
+        <div>
+          <label className="mb-1 block text-xs font-medium">SKU *</label>
+          <Input
+            value={sku}
+            onChange={(e) => setSku(e.target.value.toUpperCase())}
+            className="w-36"
+          />
+        </div>
         <div>
           <label className="mb-1 block text-xs font-medium">Label *</label>
           <Input value={label} onChange={(e) => setLabel(e.target.value)} className="w-32" />
