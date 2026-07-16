@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
+import { logger } from "@/lib/logger";
 
 export class ApiError extends Error {
   constructor(
@@ -38,7 +39,16 @@ export class ConflictError extends ApiError {
 // Central error -> HTTP response mapping used by every API route handler.
 export function handleApiError(err: unknown): NextResponse {
   if (err instanceof ApiError) {
-    return NextResponse.json({ error: err.message }, { status: err.status });
+    return NextResponse.json(
+      { error: err.message },
+      {
+        status: err.status,
+        headers:
+          err.status === 429 && "retryAfter" in err
+            ? { "Retry-After": String(err.retryAfter) }
+            : undefined,
+      },
+    );
   }
   if (err instanceof ZodError) {
     return NextResponse.json(
@@ -46,6 +56,8 @@ export function handleApiError(err: unknown): NextResponse {
       { status: 400 },
     );
   }
-  console.error(err);
+  logger.error("api_request_failed", {
+    category: err instanceof Error ? err.name : "unknown_error",
+  });
   return NextResponse.json({ error: "Internal server error" }, { status: 500 });
 }

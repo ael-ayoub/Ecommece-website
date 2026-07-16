@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useRef, useState, FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
@@ -33,6 +33,7 @@ export default function CheckoutPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [placedOrder, setPlacedOrder] = useState<OrderDto | null>(null);
+  const idempotencyKey = useRef<string | null>(null);
 
   // Pre-fill from the logged-in account once auth resolves — still editable.
   useEffect(() => {
@@ -60,8 +61,10 @@ export default function CheckoutPage() {
 
     setSubmitting(true);
     try {
+      idempotencyKey.current ??= crypto.randomUUID();
       const { order } = await apiFetch<{ order: OrderDto }>("/api/orders", {
         method: "POST",
+        headers: { "Idempotency-Key": idempotencyKey.current },
         body: JSON.stringify({
           contactName,
           contactEmail,
@@ -72,6 +75,7 @@ export default function CheckoutPage() {
       });
 
       clearCart();
+      idempotencyKey.current = null;
 
       if (isAuthenticated) {
         router.push(`/orders/${order.id}?justPlaced=1`);

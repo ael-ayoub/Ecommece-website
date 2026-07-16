@@ -62,7 +62,7 @@ export const orderCreateSchema = z.object({
     .array(
       z.object({
         variantId: z.coerce.number().int().positive(),
-        quantity: z.coerce.number().int().positive("Quantity must be at least 1"),
+        quantity: z.coerce.number().int().min(1).max(1000),
       }),
     )
     .min(1, "Your cart is empty"),

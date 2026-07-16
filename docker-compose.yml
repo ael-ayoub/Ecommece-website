@@ -5,7 +5,11 @@
 
 services:
   db:
-    image: postgres:15-alpine
+    build:
+      context: .
+      dockerfile: Dockerfile.database
+    image: database
+    container_name: database
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-ecommerce}
@@ -25,16 +29,27 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: ecommerce
+    container_name: ecommerce
     restart: unless-stopped
     env_file:
       - .env.local
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-ecommerce}:${POSTGRES_PASSWORD:-change_me}@db:5432/${POSTGRES_DB:-ecommerce}?schema=public
     ports:
       - "3000:3000"
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
 volumes:
   db_data:

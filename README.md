@@ -4,7 +4,14 @@ Cash-on-Delivery marketplace — Next.js 14 (App Router, TypeScript), PostgreSQL
 
 See [docs/architecture.md](docs/architecture.md), [docs/admin-dashboard-spec.md](docs/admin-dashboard-spec.md), [docs/client-interface-spec.md](docs/client-interface-spec.md), and [docs/project-structure.md](docs/project-structure.md) for the full design. This README only covers running the project locally.
 
-**Status:** v1 complete — auth, product catalog, cart, checkout, order management, admin dashboard with real-time updates.
+**Status:** v1 hardening in progress — critical checkout, inventory, lifecycle,
+and realtime reliability controls are implemented; see the latest report in
+`docs/` for remaining verification gaps.
+
+The realtime path uses PostgreSQL `LISTEN/NOTIFY`, an in-process outbox
+dispatcher, and authenticated SSE. Production therefore requires a long-running
+Next.js Node container behind TLS; ordinary serverless deployment is not
+supported by this realtime design.
 
 ## Tech stack (v1)
 
@@ -31,12 +38,12 @@ The whole stack — Postgres **and** the app — runs in containers, driven by a
 
 That's the whole loop. Four targets, nothing else:
 
-| Command      | Does                                                                     |
-| ------------ | ------------------------------------------------------------------------- |
-| `make`       | Build and start the full containerized stack (Postgres + app)             |
-| `make seed`  | Run the seed script inside the app container                              |
-| `make clean` | Stop and remove the containers — keeps your database volume (your data)   |
-| `make fclean`| Full reset: also removes the database volume, built images, `node_modules`, and `.next` — back to a fresh checkout |
+| Command       | Does                                                                                                               |
+| ------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `make`        | Build and start the full containerized stack (Postgres + app)                                                      |
+| `make seed`   | Run the seed script inside the app container                                                                       |
+| `make clean`  | Stop and remove the containers — keeps your database volume (your data)                                            |
+| `make fclean` | Full reset: also removes the database volume, built images, `node_modules`, and `.next` — back to a fresh checkout |
 
 Running `npm install` locally afterward is optional — it's only needed for your editor's TypeScript/ESLint tooling, not to run the app, since the container builds its own dependencies independently.
 

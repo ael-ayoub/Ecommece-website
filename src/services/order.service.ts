@@ -1,15 +1,12 @@
 import { db } from "@/lib/db";
 import { Prisma, OrderStatus } from "@prisma/client";
-import {
-  lockAndDecrementStock,
-  restoreStock,
-  decrementStockForReactivation,
-} from "@/services/inventory.service";
-import { notifyOrderChanged } from "@/lib/realtime/notify";
+import { lockAndDecrementStock, restoreStock } from "@/services/inventory.service";
 import { ConflictError, NotFoundError } from "@/lib/errors";
-import { ORDER_STATUSES, STOCK_RESTORING_STATUSES } from "@/constants/order-status";
 import type { OrderCreateInput } from "@/lib/validators";
 import type { OrderStatusValue } from "@/types/order";
+import { checkoutFingerprint, normalizeCheckoutItems } from "@/domain/checkout";
+import { canTransitionOrder, transitionRestoresStock } from "@/domain/order-status";
+import { ensureOutboxDispatcher } from "@/lib/realtime/outbox";
 
 const orderInclude = {
   items: {
@@ -20,6 +17,7 @@ const orderInclude = {
       },
     },
   },
+  statusHistory: { orderBy: { createdAt: "asc" as const } },
 } as const;
 
 type Tx = Prisma.TransactionClient;
@@ -47,61 +45,99 @@ async function lockOrderForUpdate(tx: Tx, orderId: number): Promise<LockedOrderR
   return rows[0] ?? null;
 }
 
-export async function createOrder(input: OrderCreateInput, userId: number | null) {
-  const order = await db.$transaction(async (tx) => {
-    // Locks every requested variant row, validates live stock, decrements,
-    // and returns the snapshot data (name/label/price) to freeze onto the
-    // order — all atomically, so a concurrent order for the same variant
-    // can't read stale stock (architecture.md §14).
-    const lines = await lockAndDecrementStock(
-      tx,
-      input.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity })),
-    );
+export async function createOrder(
+  input: OrderCreateInput,
+  userId: number | null,
+  idempotencyKey: string,
+) {
+  const items = normalizeCheckoutItems(input.items);
+  const fingerprint = checkoutFingerprint({ ...input, items }, userId);
+  const existing = await db.order.findUnique({ where: { idempotencyKey }, include: orderInclude });
+  if (existing) {
+    if (existing.idempotencyFingerprint !== fingerprint) {
+      throw new ConflictError("This idempotency key was already used for different checkout data.");
+    }
+    return { order: existing, replayed: true };
+  }
 
-    const totalAmount = lines
-      .reduce((sum, l) => sum + Number(l.unitPriceSnapshot) * l.quantity, 0)
-      .toFixed(2);
+  try {
+    const order = await db.$transaction(async (tx) => {
+      const lines = await lockAndDecrementStock(tx, items);
+      const totalAmount = lines
+        .reduce((sum, line) => sum + Number(line.unitPriceSnapshot) * line.quantity, 0)
+        .toFixed(2);
 
-    return tx.order.create({
-      data: {
-        userId,
-        contactName: input.contactName,
-        contactEmail: input.contactEmail,
-        contactPhone: input.contactPhone,
-        shippingAddress: input.shippingAddress,
-        status: OrderStatus.PENDING,
-        totalAmount,
-        items: {
-          create: lines.map((l) => ({
-            productId: l.productId,
-            productNameSnapshot: l.productNameSnapshot,
-            variant: {
-              create: {
-                productVariantId: l.variantId,
-                variantLabelSnapshot: l.variantLabelSnapshot,
-                unitPriceSnapshot: l.unitPriceSnapshot,
-                quantity: l.quantity,
+      const created = await tx.order.create({
+        data: {
+          userId,
+          contactName: input.contactName,
+          contactEmail: input.contactEmail,
+          contactPhone: input.contactPhone,
+          shippingAddress: input.shippingAddress,
+          status: OrderStatus.PENDING,
+          totalAmount,
+          idempotencyKey,
+          idempotencyFingerprint: fingerprint,
+          items: {
+            create: lines.map((line) => ({
+              productId: line.productId,
+              productNameSnapshot: line.productNameSnapshot,
+              variant: {
+                create: {
+                  productVariantId: line.variantId,
+                  variantLabelSnapshot: line.variantLabelSnapshot,
+                  unitPriceSnapshot: line.unitPriceSnapshot,
+                  quantity: line.quantity,
+                },
               },
+            })),
+          },
+          statusHistory: {
+            create: {
+              fromStatus: null,
+              toStatus: OrderStatus.PENDING,
+              changedByUserId: userId,
+              actorType: userId === null ? "SYSTEM" : "CLIENT",
             },
-          })),
+          },
         },
-      },
-      include: orderInclude,
+        include: orderInclude,
+      });
+      await tx.outboxEvent.create({
+        data: {
+          eventType: "ORDER_CREATED",
+          aggregateType: "ORDER",
+          aggregateId: String(created.id),
+          payload: { orderId: created.id, eventType: "ORDER_CREATED" },
+        },
+      });
+      return created;
     });
-  });
-
-  // Fired only after the transaction has committed — purely observational,
-  // never part of the stock/order logic itself (architecture.md §11).
-  await notifyOrderChanged(order.id);
-  return order;
+    ensureOutboxDispatcher();
+    return { order, replayed: false };
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      const raced = await db.order.findUnique({ where: { idempotencyKey }, include: orderInclude });
+      if (raced?.idempotencyFingerprint === fingerprint) return { order: raced, replayed: true };
+      throw new ConflictError("This idempotency key was already used for different checkout data.");
+    }
+    throw error;
+  }
 }
 
-export async function listOrdersForUser(userId: number) {
-  return db.order.findMany({
-    where: { userId },
-    orderBy: { createdAt: "desc" },
-    include: orderInclude,
-  });
+export async function listOrdersForUser(userId: number, page = 1, pageSize = 20) {
+  const where = { userId };
+  const [data, totalItems] = await Promise.all([
+    db.order.findMany({
+      where,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: orderInclude,
+    }),
+    db.order.count({ where }),
+  ]);
+  return { data, totalItems };
 }
 
 // Ownership-checked: throws NotFoundError (not Forbidden) for both a
@@ -145,14 +181,33 @@ export async function cancelOrderAsOwner(orderId: number, userId: number) {
 
     await restoreStock(tx, restorable);
 
-    return tx.order.update({
+    const updated = await tx.order.update({
       where: { id: orderId },
-      data: { status: OrderStatus.CANCELLED },
+      data: {
+        status: OrderStatus.CANCELLED,
+        statusHistory: {
+          create: {
+            fromStatus: OrderStatus.PENDING,
+            toStatus: OrderStatus.CANCELLED,
+            changedByUserId: userId,
+            actorType: "CLIENT",
+          },
+        },
+      },
       include: orderInclude,
     });
+    await tx.outboxEvent.create({
+      data: {
+        eventType: "ORDER_STATUS_CHANGED",
+        aggregateType: "ORDER",
+        aggregateId: String(orderId),
+        payload: { orderId, eventType: "ORDER_STATUS_CHANGED" },
+      },
+    });
+    return updated;
   });
 
-  await notifyOrderChanged(order.id);
+  ensureOutboxDispatcher();
   return order;
 }
 
@@ -168,6 +223,8 @@ export interface AdminOrderListParams {
   search?: string; // matches contactName or contactEmail
   sortBy?: "date" | "price";
   sortDir?: "asc" | "desc";
+  page?: number;
+  pageSize?: number;
 }
 
 // Every order regardless of guest/logged-in origin (architecture.md §6 —
@@ -185,12 +242,24 @@ export async function listOrdersAdmin(params: AdminOrderListParams) {
       : {}),
   };
 
-  const orderBy: Prisma.OrderOrderByWithRelationInput =
+  const direction = params.sortDir ?? "desc";
+  const orderBy: Prisma.OrderOrderByWithRelationInput[] =
     params.sortBy === "price"
-      ? { totalAmount: params.sortDir ?? "desc" }
-      : { createdAt: params.sortDir ?? "desc" };
-
-  return db.order.findMany({ where, orderBy, include: orderInclude });
+      ? [{ totalAmount: direction }, { id: direction }]
+      : [{ createdAt: direction }, { id: direction }];
+  const page = params.page ?? 1;
+  const pageSize = params.pageSize ?? 20;
+  const [data, totalItems] = await Promise.all([
+    db.order.findMany({
+      where,
+      orderBy,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: orderInclude,
+    }),
+    db.order.count({ where }),
+  ]);
+  return { data, totalItems };
 }
 
 export async function listRecentOrders(limit: number) {
@@ -204,11 +273,11 @@ export async function listRecentOrders(limit: number) {
 // into Cancelled/Returned restores stock (as before), and moving *out* of
 // Cancelled/Returned back into an active status re-decrements it, so
 // reversing a cancellation/return doesn't silently double-count inventory.
-export async function updateOrderStatusAsAdmin(orderId: number, nextStatus: OrderStatusValue) {
-  if (!ORDER_STATUSES.includes(nextStatus)) {
-    throw new ConflictError(`${nextStatus} is not a valid order status.`);
-  }
-
+export async function updateOrderStatusAsAdmin(
+  orderId: number,
+  nextStatus: OrderStatusValue,
+  adminUserId: number,
+) {
   const order = await db.$transaction(async (tx) => {
     const locked = await lockOrderForUpdate(tx, orderId);
 
@@ -217,44 +286,57 @@ export async function updateOrderStatusAsAdmin(orderId: number, nextStatus: Orde
     }
 
     const currentStatus = locked.status as OrderStatusValue;
-    if (currentStatus !== nextStatus) {
-      const wasRestored = STOCK_RESTORING_STATUSES.includes(currentStatus);
-      const willBeRestored = STOCK_RESTORING_STATUSES.includes(nextStatus);
-
-      if (!wasRestored && willBeRestored) {
-        const items = await tx.orderItem.findMany({
-          where: { orderId },
-          include: { variant: true },
-        });
-
-        const restorable = items
-          .map((item) => item.variant)
-          .filter((v): v is NonNullable<typeof v> => v !== null && v.productVariantId !== null)
-          .map((v) => ({ variantId: v.productVariantId as number, quantity: v.quantity }));
-
-        await restoreStock(tx, restorable);
-      } else if (wasRestored && !willBeRestored) {
-        const items = await tx.orderItem.findMany({
-          where: { orderId },
-          include: { variant: true },
-        });
-
-        const reclaimable = items
-          .map((item) => item.variant)
-          .filter((v): v is NonNullable<typeof v> => v !== null && v.productVariantId !== null)
-          .map((v) => ({ variantId: v.productVariantId as number, quantity: v.quantity }));
-
-        await decrementStockForReactivation(tx, reclaimable);
-      }
+    if (currentStatus === nextStatus) {
+      const unchanged = await tx.order.findUnique({
+        where: { id: orderId },
+        include: orderInclude,
+      });
+      if (!unchanged) throw new NotFoundError("Order not found.");
+      return unchanged;
+    }
+    if (!canTransitionOrder(currentStatus, nextStatus)) {
+      throw new ConflictError(`Order cannot move from ${currentStatus} to ${nextStatus}.`);
+    }
+    if (transitionRestoresStock(currentStatus, nextStatus)) {
+      const items = await tx.orderItem.findMany({ where: { orderId }, include: { variant: true } });
+      const restorable = items
+        .map((item) => item.variant)
+        .filter((variant): variant is NonNullable<typeof variant> =>
+          Boolean(variant?.productVariantId),
+        )
+        .map((variant) => ({
+          variantId: variant.productVariantId as number,
+          quantity: variant.quantity,
+        }));
+      await restoreStock(tx, restorable);
     }
 
-    return tx.order.update({
+    const updated = await tx.order.update({
       where: { id: orderId },
-      data: { status: nextStatus as OrderStatus },
+      data: {
+        status: nextStatus as OrderStatus,
+        statusHistory: {
+          create: {
+            fromStatus: currentStatus as OrderStatus,
+            toStatus: nextStatus as OrderStatus,
+            changedByUserId: adminUserId,
+            actorType: "ADMIN",
+          },
+        },
+      },
       include: orderInclude,
     });
+    await tx.outboxEvent.create({
+      data: {
+        eventType: "ORDER_STATUS_CHANGED",
+        aggregateType: "ORDER",
+        aggregateId: String(orderId),
+        payload: { orderId, eventType: "ORDER_STATUS_CHANGED" },
+      },
+    });
+    return updated;
   });
 
-  await notifyOrderChanged(order.id);
+  ensureOutboxDispatcher();
   return order;
 }

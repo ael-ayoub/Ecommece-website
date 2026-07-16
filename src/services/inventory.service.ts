@@ -46,7 +46,7 @@ export async function lockAndDecrementStock(
   tx: Tx,
   lines: StockLine[],
 ): Promise<OrderLineSnapshot[]> {
-  const variantIds = lines.map((l) => l.variantId);
+  const variantIds = lines.map((l) => l.variantId).sort((a, b) => a - b);
 
   const rows = await tx.$queryRaw<LockedVariantRow[]>`
     SELECT v.id, v."productId", p.name AS "productName", p."isActive" AS "productIsActive",
@@ -69,7 +69,7 @@ export async function lockAndDecrementStock(
     }
     if (row.stockQuantity < line.quantity) {
       throw new ConflictError(
-        `${row.productName} (${row.variantLabel}) has only ${row.stockQuantity} left — please adjust the quantity.`,
+        `Variant ${row.id} does not have enough stock. Please adjust the quantity.`,
       );
     }
   }
@@ -107,29 +107,5 @@ export async function restoreStock(tx: Tx, lines: { variantId: number; quantity:
       where: { id: line.variantId },
       data: { stockQuantity: { increment: line.quantity } },
     });
-  }
-}
-
-/**
- * The inverse of restoreStock() — re-decrements stock when an admin reverses
- * a Cancelled/Returned order back into an active status. Unlike
- * lockAndDecrementStock(), this only guards against going negative (an admin
- * override isn't blocked by product/variant active flags), since the goal is
- * simply keeping stockQuantity consistent with the order's new status.
- */
-export async function decrementStockForReactivation(
-  tx: Tx,
-  lines: { variantId: number; quantity: number }[],
-) {
-  for (const line of lines) {
-    const result = await tx.productVariant.updateMany({
-      where: { id: line.variantId, stockQuantity: { gte: line.quantity } },
-      data: { stockQuantity: { decrement: line.quantity } },
-    });
-    if (result.count === 0) {
-      throw new ConflictError(
-        `Not enough stock left to move this order back to an active status.`,
-      );
-    }
   }
 }

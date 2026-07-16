@@ -194,6 +194,8 @@ async function main() {
         shippingAddress: params.shippingAddress,
         status: params.status,
         totalAmount,
+        idempotencyKey: `seed-${params.contactEmail}-${params.product.id}-${params.status}`,
+        idempotencyFingerprint: "seed",
         items: {
           create: [
             {

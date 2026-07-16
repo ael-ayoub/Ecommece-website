@@ -128,14 +128,18 @@ export async function addVariant(productId: number, input: VariantCreateInput) {
   });
 }
 
-export async function updateVariant(variantId: number, input: VariantUpdateInput) {
-  const variant = await db.productVariant.findUnique({ where: { id: variantId } });
+export async function updateVariant(
+  productId: number,
+  variantId: number,
+  input: VariantUpdateInput,
+) {
+  const variant = await db.productVariant.findFirst({ where: { id: variantId, productId } });
   if (!variant) {
     throw new NotFoundError("Variant not found.");
   }
 
   return db.productVariant.update({
-    where: { id: variantId },
+    where: { id: variantId, productId },
     data: {
       ...(input.variantLabel !== undefined ? { variantLabel: input.variantLabel } : {}),
       ...(input.price !== undefined ? { price: input.price.toFixed(2) } : {}),

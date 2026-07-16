@@ -35,6 +35,12 @@ enum OrderStatus {
   CANCELLED
 }
 
+enum OrderActorType {
+  CLIENT
+  ADMIN
+  SYSTEM
+}
+
 // --- User ----------------------------------------------------------------
 // Single identity table for both admins and clients (architecture.md §2.1).
 
@@ -48,6 +54,7 @@ model User {
   createdAt    DateTime @default(now())
 
   orders Order[]
+  statusChanges OrderStatusHistory[]
 
   @@index([role])
 }
@@ -134,15 +141,48 @@ model Order {
   shippingAddress  String
   status           OrderStatus @default(PENDING)
   totalAmount      Decimal     @db.Decimal(10, 2)
+  idempotencyKey   String      @unique
+  idempotencyFingerprint String
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
   items OrderItem[]
+  statusHistory OrderStatusHistory[]
 
   @@index([userId])
   @@index([status])
   @@index([createdAt])
   @@index([status, createdAt])
+}
+
+model OrderStatusHistory {
+  id              Int            @id @default(autoincrement())
+  orderId         Int
+  order           Order          @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  fromStatus      OrderStatus?
+  toStatus        OrderStatus
+  changedByUserId Int?
+  changedByUser   User?          @relation(fields: [changedByUserId], references: [id], onDelete: SetNull)
+  actorType       OrderActorType
+  reason          String?
+  createdAt       DateTime       @default(now())
+
+  @@index([orderId, createdAt])
+  @@index([changedByUserId])
+}
+
+model OutboxEvent {
+  id            Int       @id @default(autoincrement())
+  eventType     String
+  aggregateType String
+  aggregateId   String
+  payload       Json
+  createdAt     DateTime  @default(now())
+  processedAt   DateTime?
+  attempts      Int       @default(0)
+  lastError     String?
+
+  @@index([processedAt, createdAt])
 }
 
 // --- OrderItem / OrderItemVariant ---------------------------------------------

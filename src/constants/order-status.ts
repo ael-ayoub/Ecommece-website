@@ -1,4 +1,6 @@
 import type { OrderStatusValue } from "@/types/order";
+import { allowedOrderTransitions } from "@/domain/order-status";
+export { ORDER_STATUS_LABELS } from "@/domain/order-status";
 
 // Single source of truth for the six locked order statuses' labels, colors,
 // and forward-progression order — read by every place a status is displayed
@@ -11,15 +13,6 @@ export const ORDER_STATUSES: OrderStatusValue[] = [
   "RETURNED",
   "CANCELLED",
 ];
-
-export const ORDER_STATUS_LABELS: Record<OrderStatusValue, string> = {
-  PENDING: "Pending",
-  CONFIRMED: "Confirmed",
-  SHIPPED: "Shipped",
-  DELIVERED: "Delivered",
-  RETURNED: "Returned",
-  CANCELLED: "Cancelled",
-};
 
 // Tailwind classes per architecture/admin-dashboard-spec.md's locked palette.
 export const ORDER_STATUS_COLORS: Record<OrderStatusValue, string> = {
@@ -45,7 +38,7 @@ export const ORDER_FORWARD_PATH: OrderStatusValue[] = [
 // service layer keeps stock consistent regardless of which direction the
 // status moves (see updateOrderStatusAsAdmin in order.service.ts).
 export function getAdminOrderTransitions(current: OrderStatusValue): OrderStatusValue[] {
-  return ORDER_STATUSES.filter((s) => s !== current);
+  return [...allowedOrderTransitions(current)];
 }
 
 // Transitions that restore stock — shared by the UI (to decide whether to

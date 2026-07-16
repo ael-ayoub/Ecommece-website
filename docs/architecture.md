@@ -1,5 +1,20 @@
 # E-Commerce Platform — Architecture Overview (v1)
 
+## Production-hardening baseline
+
+Checkout canonicalizes duplicate variant lines, locks variants in ascending ID
+order, and stores an application-generated idempotency key/fingerprint. Order,
+initial status history, inventory decrement, and a minimal outbox event commit
+in one PostgreSQL transaction. Realtime publication is asynchronous.
+
+The lifecycle is `PENDING → CONFIRMED → SHIPPED → DELIVERED`, with cancellation
+from `PENDING` or `CONFIRMED`, and return from `SHIPPED` or `DELIVERED`.
+`CANCELLED` and `RETURNED` are terminal.
+
+Production runs as a long-lived Next.js Node container connected to private
+managed PostgreSQL, with TLS terminated by a reverse proxy/load balancer and
+migrations run as a release step. `/api/health` is the readiness endpoint.
+
 **Payment method:** Cash on Delivery (COD) only
 **Users:** Admin (marketplace owner) and Clients (buyers, logged-in or guest)
 **Status:** v1 scope only. See "Deferred to v2" at the end for explicitly excluded features.
