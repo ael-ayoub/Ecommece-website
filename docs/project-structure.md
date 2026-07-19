@@ -118,8 +118,8 @@ src/app/
 │   │   ├── route.ts           # GET (list), POST (admin create)
 │   │   ├── [id]/route.ts      # GET/PUT/DELETE
 │   │   └── [id]/
-│   │       ├── archive/route.ts
-│   │       ├── restore/route.ts
+│   │       ├── publish/route.ts
+│   │       ├── unpublish/route.ts
 │   │       └── variants/route.ts
 │   ├── categories/{route.ts, [id]/route.ts}
 │   ├── cart/route.ts

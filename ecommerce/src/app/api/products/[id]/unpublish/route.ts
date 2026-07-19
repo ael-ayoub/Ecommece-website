@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { restoreProduct } from "@/services/product.service";
+import { unpublishProduct } from "@/services/product.service";
 import { requireAdmin } from "@/lib/guards/require-admin";
 import { handleApiError } from "@/lib/errors";
 import { assertSameOrigin } from "@/lib/security/origin";
@@ -12,7 +12,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   try {
     assertSameOrigin(req);
     await requireAdmin();
-    const product = await restoreProduct(Number(params.id));
+    const product = await unpublishProduct(Number(params.id));
     return NextResponse.json({ product });
   } catch (error) {
     return handleApiError(error);

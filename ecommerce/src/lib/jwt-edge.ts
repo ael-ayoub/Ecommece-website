@@ -14,7 +14,10 @@ export async function verifyJwtEdge(token: string): Promise<JwtPayload | null> {
   if (!secret) return null;
 
   try {
-    const { payload } = await jwtVerify(token, new TextEncoder().encode(secret));
+    const { payload } = await jwtVerify(
+      token,
+      new TextEncoder().encode(secret),
+    );
     return payload as unknown as JwtPayload;
   } catch {
     return null;

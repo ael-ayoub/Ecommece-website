@@ -18,7 +18,9 @@ export default async function ProductDetailPage({ params }: Props) {
     notFound();
   }
 
-  const anyInStock = product.variants.some((v) => v.isActive && v.stockQuantity > 0);
+  const anyInStock = product.variants.some(
+    (v) => v.isActive && v.stockQuantity > 0,
+  );
 
   return (
     <div>
@@ -50,7 +52,9 @@ export default async function ProductDetailPage({ params }: Props) {
               {formatCurrency(product.basePrice.toString())}
             </p>
           )}
-          <p className="mb-4 text-sm text-gray-600">{anyInStock ? "In stock" : "Out of stock"}</p>
+          <p className="mb-4 text-sm text-gray-600">
+            {anyInStock ? "In stock" : "Out of stock"}
+          </p>
 
           {product.variants.length > 0 ? (
             <VariantSelector
@@ -63,11 +67,15 @@ export default async function ProductDetailPage({ params }: Props) {
               showExactStock={product.showExactStock}
             />
           ) : (
-            <p className="text-sm text-red-600">No variants available for this product.</p>
+            <p className="text-sm text-red-600">
+              No variants available for this product.
+            </p>
           )}
 
           <p className="mt-6 text-sm font-medium">Payment: Cash on Delivery</p>
-          <p className="text-sm text-gray-500">You only pay when you receive your order.</p>
+          <p className="text-sm text-gray-500">
+            You only pay when you receive your order.
+          </p>
         </div>
       </div>
 

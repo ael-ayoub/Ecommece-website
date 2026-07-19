@@ -1,5 +1,11 @@
 # Product Lifecycle, Safe Deletion, and Order Snapshot Implementation
 
+> Superseded on 2026-07-19 by the final admin-management implementation.
+> Product terminology is now Published/Unpublished, and Products referenced
+> only by terminal orders may be deleted. This historical report is retained
+> for audit context; use the newer final admin-management report as current
+> behavior.
+
 Date: 2026-07-19 15:45 (Africa/Nouakchott)
 
 ## Executive summary

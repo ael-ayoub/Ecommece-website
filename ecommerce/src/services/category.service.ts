@@ -42,7 +42,10 @@ export async function updateCategory(id: number, input: CategoryInput) {
     }
   }
 
-  return db.category.update({ where: { id }, data: { name: input.name, slug } });
+  return db.category.update({
+    where: { id },
+    data: { name: input.name, slug },
+  });
 }
 
 // One-category-per-product rule (architecture.md §8) means a category with
@@ -59,8 +62,9 @@ export async function deleteCategory(id: number) {
   }
 
   if (category._count.products > 0) {
+    const noun = category._count.products === 1 ? "product" : "products";
     throw new ConflictError(
-      `This category has ${category._count.products} product(s) — reassign or remove them before deleting.`,
+      `This category contains ${category._count.products} ${noun}. Move or delete those products before deleting this category.`,
     );
   }
 

@@ -32,7 +32,9 @@ export function VariantManager({ productId }: { productId: number }) {
   const { data: product, isLoading } = useQuery({
     queryKey: ["admin", "product", productId, "variants"],
     queryFn: async () => {
-      const response = await apiFetch<{ product: ProductDto }>(`/api/products/${productId}`);
+      const response = await apiFetch<{ product: ProductDto }>(
+        `/api/products/${productId}`,
+      );
       return response.product;
     },
   });
@@ -73,7 +75,9 @@ export function VariantManager({ productId }: { productId: number }) {
   }, [dirtyRows.length]);
 
   function updateRow(id: number, patch: Partial<RowDraft>) {
-    setRows((current) => current.map((row) => (row.id === id ? { ...row, ...patch } : row)));
+    setRows((current) =>
+      current.map((row) => (row.id === id ? { ...row, ...patch } : row)),
+    );
   }
 
   async function saveChanges() {
@@ -95,7 +99,9 @@ export function VariantManager({ productId }: { productId: number }) {
         }),
       });
       setOriginal(rows);
-      queryClient.invalidateQueries({ queryKey: ["admin", "product", productId, "variants"] });
+      queryClient.invalidateQueries({
+        queryKey: ["admin", "product", productId, "variants"],
+      });
       queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Batch save failed.");
@@ -108,11 +114,16 @@ export function VariantManager({ productId }: { productId: number }) {
     event.preventDefault();
     if (!product) return;
     const structured = product.options.length > 0;
-    if (structured && product.options.some((option) => !selection[option.name])) {
+    if (
+      structured &&
+      product.options.some((option) => !selection[option.name])
+    ) {
       setError("Select one value from every Product option.");
       return;
     }
-    const automaticLabel = product.options.map((option) => selection[option.name]).join(" / ");
+    const automaticLabel = product.options
+      .map((option) => selection[option.name])
+      .join(" / ");
     setSaving(true);
     setError(null);
     try {
@@ -136,7 +147,9 @@ export function VariantManager({ productId }: { productId: number }) {
         queryKey: ["admin", "product", productId, "variants"],
       });
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Failed to add combination.");
+      setError(
+        caught instanceof Error ? caught.message : "Failed to add combination.",
+      );
     } finally {
       setSaving(false);
     }
@@ -165,7 +178,11 @@ export function VariantManager({ productId }: { productId: number }) {
           >
             Discard changes
           </Button>
-          <Button type="button" disabled={!dirtyRows.length || saving} onClick={saveChanges}>
+          <Button
+            type="button"
+            disabled={!dirtyRows.length || saving}
+            onClick={saveChanges}
+          >
             {saving ? "Saving…" : "Save changes"}
           </Button>
         </div>
@@ -187,18 +204,25 @@ export function VariantManager({ productId }: { productId: number }) {
             {rows.map((row) => {
               const dirty = dirtyRows.some((item) => item.id === row.id);
               return (
-                <tr key={row.id} className={`border-b ${dirty ? "bg-yellow-50" : ""}`}>
+                <tr
+                  key={row.id}
+                  className={`border-b ${dirty ? "bg-yellow-50" : ""}`}
+                >
                   <td>
                     <Input
                       value={row.variantLabel}
-                      onChange={(event) => updateRow(row.id, { variantLabel: event.target.value })}
+                      onChange={(event) =>
+                        updateRow(row.id, { variantLabel: event.target.value })
+                      }
                     />
                   </td>
                   <td>
                     <Input
                       value={row.sku}
                       onChange={(event) =>
-                        updateRow(row.id, { sku: event.target.value.toUpperCase() })
+                        updateRow(row.id, {
+                          sku: event.target.value.toUpperCase(),
+                        })
                       }
                     />
                   </td>
@@ -209,7 +233,10 @@ export function VariantManager({ productId }: { productId: number }) {
                       value={row.stockQuantity}
                       onChange={(event) =>
                         updateRow(row.id, {
-                          stockQuantity: Math.max(0, Number(event.target.value)),
+                          stockQuantity: Math.max(
+                            0,
+                            Number(event.target.value),
+                          ),
                         })
                       }
                     />
@@ -221,7 +248,9 @@ export function VariantManager({ productId }: { productId: number }) {
                       step="0.01"
                       value={row.price}
                       placeholder="Uses base"
-                      onChange={(event) => updateRow(row.id, { price: event.target.value })}
+                      onChange={(event) =>
+                        updateRow(row.id, { price: event.target.value })
+                      }
                     />
                     <button
                       type="button"
@@ -231,13 +260,17 @@ export function VariantManager({ productId }: { productId: number }) {
                       Reset to base
                     </button>
                   </td>
-                  <td>{row.price ? row.price : `${product.basePrice} (base)`}</td>
+                  <td>
+                    {row.price ? row.price : `${product.basePrice} (base)`}
+                  </td>
                   <td>
                     <label>
                       <input
                         type="checkbox"
                         checked={row.isActive}
-                        onChange={(event) => updateRow(row.id, { isActive: event.target.checked })}
+                        onChange={(event) =>
+                          updateRow(row.id, { isActive: event.target.checked })
+                        }
                       />{" "}
                       {row.isActive ? "Enabled" : "Disabled"}
                     </label>
@@ -253,8 +286,8 @@ export function VariantManager({ productId }: { productId: number }) {
         <h2 className="font-semibold">Add explicit combination</h2>
         {product.options.length === 0 && (
           <p className="text-xs text-amber-700">
-            Legacy unstructured Product: combination options are unavailable; use a clear display
-            label.
+            Legacy unstructured Product: combination options are unavailable;
+            use a clear display label.
           </p>
         )}
         <div className="mt-3 grid gap-3 md:grid-cols-3">
@@ -264,7 +297,10 @@ export function VariantManager({ productId }: { productId: number }) {
               <select
                 value={selection[option.name] ?? ""}
                 onChange={(event) => {
-                  const next = { ...selection, [option.name]: event.target.value };
+                  const next = {
+                    ...selection,
+                    [option.name]: event.target.value,
+                  };
                   setSelection(next);
                   const automatic = product.options
                     .map((item) => next[item.name])
@@ -289,11 +325,17 @@ export function VariantManager({ productId }: { productId: number }) {
           ))}
           <label className="text-sm">
             Display label
-            <Input value={label} onChange={(event) => setLabel(event.target.value)} />
+            <Input
+              value={label}
+              onChange={(event) => setLabel(event.target.value)}
+            />
           </label>
           <label className="text-sm">
             SKU
-            <Input value={sku} onChange={(event) => setSku(event.target.value.toUpperCase())} />
+            <Input
+              value={sku}
+              onChange={(event) => setSku(event.target.value.toUpperCase())}
+            />
           </label>
           <label className="text-sm">
             Stock
@@ -317,7 +359,8 @@ export function VariantManager({ productId }: { productId: number }) {
           </label>
         </div>
         <p className="mt-2 text-xs text-gray-500">
-          New combinations start disabled until reviewed. Missing combinations are not created.
+          New combinations start disabled until reviewed. Missing combinations
+          are not created.
         </p>
         <Button type="submit" disabled={saving}>
           Add combination

@@ -61,7 +61,9 @@ const configurableProductCreateSchema = productBaseSchema
       .array(
         z.object({
           sku: skuCodeSchema,
-          optionValues: z.record(z.string(), z.string().trim().min(1)).optional(),
+          optionValues: z
+            .record(z.string(), z.string().trim().min(1))
+            .optional(),
           selection: z.record(z.string(), z.string().trim().min(1)).optional(),
           variantLabel: z.string().trim().min(1).max(200).optional(),
           label: z.string().trim().min(1).max(200).optional(),
@@ -83,9 +85,15 @@ const configurableProductCreateSchema = productBaseSchema
     sourceTemplateIds: z.array(z.coerce.number().int().positive()).optional(),
   })
   .superRefine((input, ctx) => {
-    const optionNames = input.options.map((option) => option.name.toLowerCase());
+    const optionNames = input.options.map((option) =>
+      option.name.toLowerCase(),
+    );
     if (new Set(optionNames).size !== optionNames.length) {
-      ctx.addIssue({ code: "custom", message: "Option names must be unique", path: ["options"] });
+      ctx.addIssue({
+        code: "custom",
+        message: "Option names must be unique",
+        path: ["options"],
+      });
     }
     input.options.forEach((option, index) => {
       const values = option.values.map((value) => value.toLowerCase());
@@ -99,7 +107,11 @@ const configurableProductCreateSchema = productBaseSchema
     });
     const skus = input.variants.map((variant) => variant.sku);
     if (new Set(skus).size !== skus.length) {
-      ctx.addIssue({ code: "custom", message: "SKU codes must be unique", path: ["variants"] });
+      ctx.addIssue({
+        code: "custom",
+        message: "SKU codes must be unique",
+        path: ["variants"],
+      });
     }
     input.variants.forEach((variant, index) => {
       if (!variant.variantLabel?.trim()) {
@@ -135,7 +147,11 @@ export const variantCreateSchema = z.object({
   variantLabel: z.string().trim().min(1, "Variant label is required"),
   optionValues: z.record(z.string(), z.string().trim().min(1)).optional(),
   price: z.coerce.number().nonnegative().optional(),
-  stockQuantity: z.coerce.number().int().min(0, "Stock cannot be negative").default(0),
+  stockQuantity: z.coerce
+    .number()
+    .int()
+    .min(0, "Stock cannot be negative")
+    .default(0),
   isActive: z.boolean().optional().default(true),
 });
 export type VariantCreateInput = z.infer<typeof variantCreateSchema>;
@@ -144,7 +160,11 @@ export const variantUpdateSchema = z.object({
   sku: skuCodeSchema.optional(),
   variantLabel: z.string().trim().min(1).optional(),
   price: z.coerce.number().nonnegative().optional(),
-  stockQuantity: z.coerce.number().int().min(0, "Stock cannot be negative").optional(),
+  stockQuantity: z.coerce
+    .number()
+    .int()
+    .min(0, "Stock cannot be negative")
+    .optional(),
   isActive: z.boolean().optional(),
 });
 export type VariantUpdateInput = z.infer<typeof variantUpdateSchema>;
@@ -176,28 +196,60 @@ export const optionTemplateCreateSchema = z.object({
   inputType: z.enum(["TEXT", "COLOR", "NUMBER"]).optional().default("TEXT"),
   description: z.string().trim().max(300).nullable().optional(),
   values: z.array(templateValueSchema).min(1).max(100),
-  categoryIds: z.array(z.coerce.number().int().positive()).max(50).optional().default([]),
+  categoryIds: z
+    .array(z.coerce.number().int().positive())
+    .max(50)
+    .optional()
+    .default([]),
   cloneFromTemplateId: z.coerce.number().int().positive().optional(),
 });
-export type OptionTemplateCreateInput = z.infer<typeof optionTemplateCreateSchema>;
+export type OptionTemplateCreateInput = z.infer<
+  typeof optionTemplateCreateSchema
+>;
 
 export const optionTemplateUpdateSchema = optionTemplateCreateSchema
   .omit({ cloneFromTemplateId: true })
   .partial();
-export type OptionTemplateUpdateInput = z.infer<typeof optionTemplateUpdateSchema>;
+export type OptionTemplateUpdateInput = z.infer<
+  typeof optionTemplateUpdateSchema
+>;
 
-export const optionTemplatePreferenceSchema = z.object({ isPinned: z.boolean() });
+export const optionTemplatePreferenceSchema = z.object({
+  isPinned: z.boolean(),
+});
 
 export const categorySchema = z.object({
   name: z.string().trim().min(1, "Category name is required"),
 });
 export type CategoryInput = z.infer<typeof categorySchema>;
 
+export const clientUpdateSchema = z
+  .object({
+    name: z.string().trim().min(1, "Name is required").optional(),
+    email: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .email("Enter a valid email address")
+      .optional(),
+    phone: z.string().trim().min(6, "Enter a valid phone number").optional(),
+    isActive: z.boolean().optional(),
+  })
+  .refine(
+    (input) => Object.keys(input).length > 0,
+    "Provide at least one customer change.",
+  );
+export type ClientUpdateInput = z.infer<typeof clientUpdateSchema>;
+
 // --- Checkout / Orders (Phase 5) --------------------------------------------
 
 export const orderCreateSchema = z.object({
   contactName: z.string().trim().min(1, "Full name is required"),
-  contactEmail: z.string().trim().toLowerCase().email("Enter a valid email address"),
+  contactEmail: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email("Enter a valid email address"),
   contactPhone: z.string().trim().min(6, "Enter a valid phone number"),
   shippingAddress: z.string().trim().min(1, "Delivery address is required"),
   items: z
@@ -214,6 +266,13 @@ export type OrderCreateInput = z.infer<typeof orderCreateSchema>;
 // --- Admin order management (Phase 6) ---------------------------------------
 
 export const orderStatusUpdateSchema = z.object({
-  status: z.enum(["PENDING", "CONFIRMED", "SHIPPED", "DELIVERED", "RETURNED", "CANCELLED"]),
+  status: z.enum([
+    "PENDING",
+    "CONFIRMED",
+    "SHIPPED",
+    "DELIVERED",
+    "RETURNED",
+    "CANCELLED",
+  ]),
 });
 export type OrderStatusUpdateInput = z.infer<typeof orderStatusUpdateSchema>;

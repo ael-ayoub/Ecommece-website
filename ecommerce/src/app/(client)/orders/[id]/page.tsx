@@ -39,7 +39,9 @@ export default function OrderDetailPage({ params }: Props) {
       queryClient.invalidateQueries({ queryKey: ["my-orders"] });
       setConfirmingCancel(false);
     } catch (err) {
-      setCancelError(err instanceof Error ? err.message : "Failed to cancel order.");
+      setCancelError(
+        err instanceof Error ? err.message : "Failed to cancel order.",
+      );
     } finally {
       setCancelling(false);
     }
@@ -73,11 +75,15 @@ export default function OrderDetailPage({ params }: Props) {
 
       <OrderItemsTable items={order.items} total={order.totalAmount} />
 
-      <p className="mt-4 text-sm text-gray-600">Delivery Address: {order.shippingAddress}</p>
+      <p className="mt-4 text-sm text-gray-600">
+        Delivery Address: {order.shippingAddress}
+      </p>
 
       {order.status === "PENDING" && (
         <div className="mt-6">
-          {cancelError && <p className="mb-2 text-sm text-red-600">{cancelError}</p>}
+          {cancelError && (
+            <p className="mb-2 text-sm text-red-600">{cancelError}</p>
+          )}
           {!confirmingCancel ? (
             <Button variant="danger" onClick={() => setConfirmingCancel(true)}>
               Cancel Order
@@ -85,13 +91,21 @@ export default function OrderDetailPage({ params }: Props) {
           ) : (
             <div className="rounded-md border border-red-200 bg-red-50 p-4">
               <p className="mb-3 text-sm">
-                Cancel this order? Stock will be restored. You can place a new order anytime.
+                Cancel this order? Stock will be restored. You can place a new
+                order anytime.
               </p>
               <div className="flex gap-2">
-                <Button variant="secondary" onClick={() => setConfirmingCancel(false)}>
+                <Button
+                  variant="secondary"
+                  onClick={() => setConfirmingCancel(false)}
+                >
                   Go Back
                 </Button>
-                <Button variant="danger" onClick={handleCancel} disabled={cancelling}>
+                <Button
+                  variant="danger"
+                  onClick={handleCancel}
+                  disabled={cancelling}
+                >
                   {cancelling ? "Cancelling…" : "Yes, Cancel Order"}
                 </Button>
               </div>

@@ -18,7 +18,11 @@ export async function PUT(req: NextRequest, { params }: Params) {
     await requireAdmin();
     const body = await req.json();
     const input = variantUpdateSchema.parse(body);
-    const variant = await updateVariant(Number(params.id), Number(params.variantId), input);
+    const variant = await updateVariant(
+      Number(params.id),
+      Number(params.variantId),
+      input,
+    );
     return NextResponse.json({ variant });
   } catch (err) {
     return handleApiError(err);

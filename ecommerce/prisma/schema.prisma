@@ -67,6 +67,7 @@ model User {
   passwordHash String
   phone        String
   role         Role     @default(CLIENT)
+  isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
 
   orders                    Order[]
@@ -75,6 +76,7 @@ model User {
   optionTemplatePreferences UserOptionTemplatePreference[]
 
   @@index([role])
+  @@index([role, isActive])
 }
 
 // --- Category --------------------------------------------------------------
@@ -261,19 +263,20 @@ model UserOptionTemplatePreference {
 // for architecture.md to be updated to match.
 
 model Order {
-  id                     Int         @id @default(autoincrement())
-  userId                 Int?
-  user                   User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
-  contactName            String
-  contactEmail           String
-  contactPhone           String
-  shippingAddress        String
-  status                 OrderStatus @default(PENDING)
-  totalAmount            Decimal     @db.Decimal(10, 2)
-  idempotencyKey         String      @unique
-  idempotencyFingerprint String
-  createdAt              DateTime    @default(now())
-  updatedAt              DateTime    @updatedAt
+  id                        Int         @id @default(autoincrement())
+  userId                    Int?
+  user                      User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  customerAccountIdSnapshot Int?
+  contactName               String
+  contactEmail              String
+  contactPhone              String
+  shippingAddress           String
+  status                    OrderStatus @default(PENDING)
+  totalAmount               Decimal     @db.Decimal(10, 2)
+  idempotencyKey            String      @unique
+  idempotencyFingerprint    String
+  createdAt                 DateTime    @default(now())
+  updatedAt                 DateTime    @updatedAt
 
   items         OrderItem[]
   statusHistory OrderStatusHistory[]

@@ -45,7 +45,9 @@ export function OrderStatusSelect({ orderId, status }: Props) {
         body: JSON.stringify({ status: next }),
       });
       queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
-      queryClient.invalidateQueries({ queryKey: ["admin", "order", String(orderId)] });
+      queryClient.invalidateQueries({
+        queryKey: ["admin", "order", String(orderId)],
+      });
       queryClient.invalidateQueries({ queryKey: ["admin", "analytics"] });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update status.");

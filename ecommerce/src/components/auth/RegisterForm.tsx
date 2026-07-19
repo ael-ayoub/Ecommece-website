@@ -31,9 +31,11 @@ export function RegisterForm() {
   function validate(): boolean {
     const next: FieldErrors = {};
     if (!name.trim()) next.name = "Name is required";
-    if (!/^\S+@\S+\.\S+$/.test(email)) next.email = "Enter a valid email address";
+    if (!/^\S+@\S+\.\S+$/.test(email))
+      next.email = "Enter a valid email address";
     if (phone.trim().length < 6) next.phone = "Enter a valid phone number";
-    if (password.length < 8) next.password = "Password must be at least 8 characters";
+    if (password.length < 8)
+      next.password = "Password must be at least 8 characters";
     setErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -64,24 +66,39 @@ export function RegisterForm() {
       <h1 className="text-xl font-bold">Create account</h1>
 
       {formError && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>
+        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+          {formError}
+        </p>
       )}
 
       <div>
         <label className="mb-1 block text-sm font-medium">Name *</label>
-        <Input value={name} onChange={(e) => setName(e.target.value)} required />
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+        />
         <FieldError message={errors.name} />
       </div>
 
       <div>
         <label className="mb-1 block text-sm font-medium">Email *</label>
-        <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <Input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
         <FieldError message={errors.email} />
       </div>
 
       <div>
         <label className="mb-1 block text-sm font-medium">Phone *</label>
-        <Input value={phone} onChange={(e) => setPhone(e.target.value)} required />
+        <Input
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          required
+        />
         <FieldError message={errors.phone} />
       </div>
 

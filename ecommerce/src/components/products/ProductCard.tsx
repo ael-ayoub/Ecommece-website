@@ -10,9 +10,13 @@ export function ProductCard({ product }: { product: ProductDto }) {
   const { addItem } = useCart();
   const [added, setAdded] = useState(false);
 
-  const activeVariants = product.variants.filter((v) => v.isActive && v.stockQuantity > 0);
+  const activeVariants = product.variants.filter(
+    (v) => v.isActive && v.stockQuantity > 0,
+  );
   const singleVariant =
-    product.productType === "SIMPLE" && activeVariants.length === 1 ? activeVariants[0] : null;
+    product.productType === "SIMPLE" && activeVariants.length === 1
+      ? activeVariants[0]
+      : null;
   const inStock = activeVariants.length > 0;
 
   function handleAddToCart(e: React.MouseEvent) {
@@ -31,7 +35,9 @@ export function ProductCard({ product }: { product: ProductDto }) {
         productVariantId: singleVariant.id,
         sku: singleVariant.sku,
         variantLabel: singleVariant.variantLabel,
-        unitPrice: Number((singleVariant.price ?? product.basePrice).toString()),
+        unitPrice: Number(
+          (singleVariant.price ?? product.basePrice).toString(),
+        ),
         stockQuantity: singleVariant.stockQuantity,
       },
       1,

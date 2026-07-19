@@ -7,6 +7,8 @@ import { handleApiError } from "@/lib/errors";
 import { assertSameOrigin } from "@/lib/security/origin";
 import { enforceRateLimit, requestIp } from "@/lib/rate-limit";
 import { paginationMeta, parsePagination } from "@/lib/pagination";
+import { AUTH_COOKIE_NAME } from "@/lib/auth-cookie";
+import { UnauthorizedError } from "@/lib/errors";
 
 // Guest checkout is allowed (architecture.md §6), so this endpoint is
 // intentionally NOT behind requireUser() — it just attaches userId when a
@@ -15,6 +17,11 @@ export async function POST(req: NextRequest) {
   try {
     assertSameOrigin(req);
     const currentUser = await getCurrentUser();
+    if (req.cookies.has(AUTH_COOKIE_NAME) && !currentUser) {
+      throw new UnauthorizedError(
+        "Your account is disabled or your session is no longer valid.",
+      );
+    }
     enforceRateLimit(
       `checkout:${requestIp(req)}:${currentUser?.id ?? "guest"}`,
       Number(process.env.RATE_LIMIT_CHECKOUT_MAX ?? 10),
@@ -25,7 +32,9 @@ export async function POST(req: NextRequest) {
     const idempotencyKey = req.headers.get("idempotency-key");
     if (
       !idempotencyKey ||
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idempotencyKey)
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        idempotencyKey,
+      )
     ) {
       return NextResponse.json(
         { error: "A valid Idempotency-Key UUID is required." },
@@ -33,7 +42,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const result = await createOrder(input, currentUser?.id ?? null, idempotencyKey);
+    const result = await createOrder(
+      input,
+      currentUser?.id ?? null,
+      idempotencyKey,
+    );
     return NextResponse.json(
       { order: result.order, idempotentReplay: result.replayed },
       { status: result.replayed ? 200 : 201 },

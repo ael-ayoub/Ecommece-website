@@ -1,13 +1,16 @@
 import { formatCurrency } from "@/lib/format";
+import Link from "next/link";
 import type { OrderItemDto } from "@/types/order";
 import type { Prisma } from "@prisma/client";
 
 export function OrderItemsTable({
   items,
   total,
+  productLinkBase = "/products",
 }: {
   items: OrderItemDto[];
   total: string | number | Prisma.Decimal;
+  productLinkBase?: string;
 }) {
   return (
     <table className="w-full text-sm">
@@ -27,9 +30,21 @@ export function OrderItemsTable({
           return (
             <tr key={item.id} className="border-b border-gray-100">
               <td className="py-2">
-                <span>{item.productNameSnapshot}</span>
+                {item.product &&
+                (productLinkBase !== "/products" || item.product.isActive) ? (
+                  <Link
+                    href={`${productLinkBase}/${item.product.id}`}
+                    className="underline"
+                  >
+                    {item.productNameSnapshot}
+                  </Link>
+                ) : (
+                  <span>{item.productNameSnapshot}</span>
+                )}
                 {!item.product ? (
-                  <span className="ml-2 text-xs text-gray-500">Product no longer available</span>
+                  <span className="ml-2 text-xs text-gray-500">
+                    Product was deleted
+                  </span>
                 ) : null}
               </td>
               <td>
@@ -48,7 +63,9 @@ export function OrderItemsTable({
               </td>
               <td>{qty}</td>
               <td>{formatCurrency(unitPrice)}</td>
-              <td className="font-medium">{formatCurrency(Number(unitPrice.toString()) * qty)}</td>
+              <td className="font-medium">
+                {formatCurrency(Number(unitPrice.toString()) * qty)}
+              </td>
             </tr>
           );
         })}

@@ -1,4 +1,7 @@
-import { ORDER_FORWARD_PATH, ORDER_STATUS_LABELS } from "@/constants/order-status";
+import {
+  ORDER_FORWARD_PATH,
+  ORDER_STATUS_LABELS,
+} from "@/constants/order-status";
 import type { OrderStatusValue } from "@/types/order";
 
 // If the order is Cancelled/Returned (terminal, off the forward path), show
@@ -23,13 +26,19 @@ export function OrderStatusTimeline({ status }: { status: OrderStatusValue }) {
           <div className="flex flex-col items-center">
             <div
               className={`h-3 w-3 rounded-full border-2 ${
-                i <= currentIndex ? "border-gray-900 bg-gray-900" : "border-gray-300 bg-white"
+                i <= currentIndex
+                  ? "border-gray-900 bg-gray-900"
+                  : "border-gray-300 bg-white"
               }`}
             />
-            <span className="mt-1 text-xs text-gray-600">{ORDER_STATUS_LABELS[step]}</span>
+            <span className="mt-1 text-xs text-gray-600">
+              {ORDER_STATUS_LABELS[step]}
+            </span>
           </div>
           {i < ORDER_FORWARD_PATH.length - 1 && (
-            <div className={`mx-1 h-0.5 w-8 ${i < currentIndex ? "bg-gray-900" : "bg-gray-300"}`} />
+            <div
+              className={`mx-1 h-0.5 w-8 ${i < currentIndex ? "bg-gray-900" : "bg-gray-300"}`}
+            />
           )}
         </div>
       ))}

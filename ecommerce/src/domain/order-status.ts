@@ -9,7 +9,10 @@ export const ORDER_STATUS_LABELS: Record<OrderStatusValue, string> = {
   CANCELLED: "Cancelled",
 };
 
-export const ORDER_TRANSITIONS: Record<OrderStatusValue, readonly OrderStatusValue[]> = {
+export const ORDER_TRANSITIONS: Record<
+  OrderStatusValue,
+  readonly OrderStatusValue[]
+> = {
   PENDING: ["CONFIRMED", "CANCELLED"],
   CONFIRMED: ["SHIPPED", "CANCELLED"],
   SHIPPED: ["DELIVERED", "RETURNED"],
@@ -22,11 +25,17 @@ export function allowedOrderTransitions(status: OrderStatusValue) {
   return ORDER_TRANSITIONS[status];
 }
 
-export function canTransitionOrder(from: OrderStatusValue, to: OrderStatusValue) {
+export function canTransitionOrder(
+  from: OrderStatusValue,
+  to: OrderStatusValue,
+) {
   return ORDER_TRANSITIONS[from].includes(to);
 }
 
-export function transitionRestoresStock(from: OrderStatusValue, to: OrderStatusValue) {
+export function transitionRestoresStock(
+  from: OrderStatusValue,
+  to: OrderStatusValue,
+) {
   return (
     ((from === "PENDING" || from === "CONFIRMED") && to === "CANCELLED") ||
     ((from === "SHIPPED" || from === "DELIVERED") && to === "RETURNED")

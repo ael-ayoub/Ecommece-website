@@ -46,7 +46,9 @@ export function useRealtimeOrders() {
       queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "analytics"] });
       if (orderId) {
-        queryClient.invalidateQueries({ queryKey: ["admin", "order", String(orderId)] });
+        queryClient.invalidateQueries({
+          queryKey: ["admin", "order", String(orderId)],
+        });
       }
     });
 

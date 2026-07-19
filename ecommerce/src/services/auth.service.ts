@@ -12,8 +12,16 @@ function toAuthUser(user: {
   email: string;
   phone: string;
   role: Role;
+  isActive: boolean;
 }): AuthUser {
-  return { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role };
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    role: user.role,
+    isActive: user.isActive,
+  };
 }
 
 export async function registerUser(input: RegisterInput): Promise<{
@@ -38,7 +46,11 @@ export async function registerUser(input: RegisterInput): Promise<{
   });
 
   const authUser = toAuthUser(user);
-  const token = signJwt({ sub: String(user.id), role: user.role, email: user.email });
+  const token = signJwt({
+    sub: String(user.id),
+    role: user.role,
+    email: user.email,
+  });
 
   return { user: authUser, token };
 }
@@ -51,7 +63,7 @@ export async function loginUser(input: LoginInput): Promise<{
 
   // Deliberately generic message for both "no such user" and "wrong password"
   // so a login attempt never reveals whether an email is registered.
-  if (!user) {
+  if (!user || !user.isActive) {
     throw new UnauthorizedError("Invalid email or password.");
   }
 
@@ -61,7 +73,11 @@ export async function loginUser(input: LoginInput): Promise<{
   }
 
   const authUser = toAuthUser(user);
-  const token = signJwt({ sub: String(user.id), role: user.role, email: user.email });
+  const token = signJwt({
+    sub: String(user.id),
+    role: user.role,
+    email: user.email,
+  });
 
   return { user: authUser, token };
 }

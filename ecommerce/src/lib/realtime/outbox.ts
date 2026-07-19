@@ -25,7 +25,11 @@ export async function dispatchOutboxBatch() {
         await db.$executeRaw`SELECT pg_notify('order_changes', ${payload})`;
         await db.outboxEvent.update({
           where: { id: event.id },
-          data: { processedAt: new Date(), attempts: { increment: 1 }, lastError: null },
+          data: {
+            processedAt: new Date(),
+            attempts: { increment: 1 },
+            lastError: null,
+          },
         });
         logger.info("outbox_event_processed", { outboxEventId: event.id });
       } catch (error) {
@@ -33,10 +37,16 @@ export async function dispatchOutboxBatch() {
           where: { id: event.id },
           data: {
             attempts: { increment: 1 },
-            lastError: error instanceof Error ? error.message.slice(0, 500) : "publish_failed",
+            lastError:
+              error instanceof Error
+                ? error.message.slice(0, 500)
+                : "publish_failed",
           },
         });
-        logger.warn("outbox_event_failed", { outboxEventId: event.id, category: "publish_failed" });
+        logger.warn("outbox_event_failed", {
+          outboxEventId: event.id,
+          category: "publish_failed",
+        });
       }
     }
   } finally {

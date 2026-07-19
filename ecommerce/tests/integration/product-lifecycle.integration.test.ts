@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { db } from "../../src/lib/db";
 import {
-  archiveProduct,
   batchUpdateVariants,
   createProduct,
   getProductById,
   listProducts,
   permanentlyDeleteProduct,
-  restoreProduct,
+  publishProduct,
+  unpublishProduct,
   updateProduct,
 } from "../../src/services/product.service";
 import {
@@ -21,7 +21,7 @@ import { ConflictError } from "../../src/lib/errors";
 const enabled = Boolean(process.env.TEST_DATABASE_URL);
 
 test(
-  "archive, restore, safe deletion, snapshots, and inventory lifecycle",
+  "publish, unpublish, terminal-aware deletion, snapshots, and inventory lifecycle",
   { skip: !enabled },
   async () => {
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
@@ -42,7 +42,7 @@ test(
     });
     const disposableVariantId = disposable.variants[0].id;
 
-    await archiveProduct(disposable.id);
+    await unpublishProduct(disposable.id);
     const archived = await getProductById(disposable.id, {
       includeInactive: true,
     });
@@ -50,7 +50,7 @@ test(
     assert.equal(
       archived.variants[0].stockQuantity,
       7,
-      "archive must not change stock",
+      "unpublish must not change stock",
     );
     await assert.rejects(() => getProductById(disposable.id));
     const publicList = await listProducts({
@@ -60,10 +60,10 @@ test(
     assert.equal(
       publicList.products.length,
       0,
-      "archived Product must be hidden publicly",
+      "unpublished Product must be hidden publicly",
     );
 
-    await restoreProduct(disposable.id);
+    await publishProduct(disposable.id);
     assert.equal((await getProductById(disposable.id)).isActive, true);
     await permanentlyDeleteProduct(disposable.id);
     assert.equal(
@@ -142,7 +142,7 @@ test(
         where: { id: orderedVariant.id },
       })
     ).stockQuantity;
-    await archiveProduct(ordered.id);
+    await unpublishProduct(ordered.id);
     assert.equal(
       (
         await db.productVariant.findUniqueOrThrow({
@@ -150,7 +150,7 @@ test(
         })
       ).stockQuantity,
       stockBeforeArchive,
-      "archive must not alter ordered SKU inventory",
+      "unpublish must not alter ordered SKU inventory",
     );
     await assert.rejects(
       () =>
@@ -199,8 +199,7 @@ test(
       () => permanentlyDeleteProduct(ordered.id),
       (error: unknown) =>
         error instanceof ConflictError &&
-        error.message.includes("order history") &&
-        error.message.includes("Archive"),
+        error.message.includes("active order"),
     );
     assert.ok(await db.product.findUnique({ where: { id: ordered.id } }));
 
@@ -213,6 +212,23 @@ test(
       ).stockQuantity,
       10,
       "cancellation must still restore stock after archive and live catalog edits",
+    );
+    await permanentlyDeleteProduct(ordered.id);
+    assert.equal(
+      await db.product.findUnique({ where: { id: ordered.id } }),
+      null,
+    );
+    const afterDeletion = await getOrderForUser(checkout.order.id, user.id);
+    assert.equal(afterDeletion.items[0].product, null);
+    assert.equal(afterDeletion.items[0].variant?.productVariant, null);
+    assert.equal(afterDeletion.items[0].productNameSnapshot, ordered.name);
+    assert.equal(
+      afterDeletion.items[0].variant?.skuSnapshot,
+      orderedVariant.sku,
+    );
+    assert.equal(
+      afterDeletion.items[0].variant?.unitPriceSnapshot.toString(),
+      "25",
     );
   },
 );

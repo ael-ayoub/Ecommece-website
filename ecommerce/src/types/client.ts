@@ -5,6 +5,7 @@ export interface ClientListItemDto {
   name: string;
   email: string;
   phone: string;
+  isActive: boolean;
   createdAt: string;
   orderCount: number;
   lastOrderDate: string | null;
@@ -15,6 +16,7 @@ export interface ClientDetailDto {
   name: string;
   email: string;
   phone: string;
+  isActive: boolean;
   createdAt: string;
   orders: OrderDto[];
 }

@@ -17,7 +17,11 @@ export async function PUT(req: NextRequest, { params }: Params) {
     assertSameOrigin(req);
     const admin = await requireAdmin();
     const input = optionTemplateUpdateSchema.parse(await req.json());
-    const template = await updatePersonalOptionTemplate(admin.id, Number(params.id), input);
+    const template = await updatePersonalOptionTemplate(
+      admin.id,
+      Number(params.id),
+      input,
+    );
     return NextResponse.json({ template });
   } catch (error) {
     return handleApiError(error);

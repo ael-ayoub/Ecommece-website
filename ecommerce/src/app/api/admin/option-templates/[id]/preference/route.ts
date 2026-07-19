@@ -14,7 +14,11 @@ export async function PUT(req: NextRequest, { params }: Params) {
     assertSameOrigin(req);
     const admin = await requireAdmin();
     const { isPinned } = optionTemplatePreferenceSchema.parse(await req.json());
-    const preference = await setOptionTemplatePinned(admin.id, Number(params.id), isPinned);
+    const preference = await setOptionTemplatePinned(
+      admin.id,
+      Number(params.id),
+      isPinned,
+    );
     return NextResponse.json({ preference });
   } catch (error) {
     return handleApiError(error);

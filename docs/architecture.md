@@ -26,23 +26,28 @@ ProductVariant rows. Missing combinations mean Not offered; an existing active
 SKU with zero stock means Out of stock. Variant labels are editable presentation
 data, while optionCombinationKey remains the stable combination identity.
 
-## Product lifecycle and immutable order history
+## Product, customer, and immutable-history lifecycle
 
-Archive and permanent deletion are distinct operations:
+`Product.isActive` stores the two Product statuses without a duplicate enum:
 
-- **Archive** sets `Product.isActive = false`. It leaves SKUs, stock, options,
-  and order relations unchanged. Public listing, search, category browsing,
-  direct detail access, and checkout exclude archived Products. Admins can
-  continue to edit and later restore them.
-- **Restore** sets `Product.isActive = true`. SKU active states and stock remain
-  whatever they were before and during the archive period.
-- **Permanent deletion** is permitted only when neither the Product nor any of
-  its SKUs has appeared in an order. Related option associations, option
-  values, options, and SKUs are removed in one transaction. No stock
-  decrement, restoration, or reservation is performed.
-- A Product with order history can never be permanently deleted. It remains
-  archived so cancellation or return can restore inventory to the original
-  SKU.
+- **PUBLISHED** (`true`) is visible and purchasable.
+- **UNPUBLISHED** (`false`) is absent from every public catalog and checkout
+  path, remains editable, and can be published again. Publishing/unpublishing
+  never changes SKU inventory.
+- Permanent deletion is rejected while a Pending, Confirmed, or Shipped order
+  references the Product or one of its SKUs. After all referencing orders are
+  terminal, deletion removes catalog rows while nullable order relations become
+  null and immutable purchase snapshots remain.
+
+`User.isActive` stores ACTIVE/DISABLED customer status:
+
+- ACTIVE customers can authenticate and order.
+- DISABLED customers cannot authenticate; database-backed session resolution
+  invalidates existing sessions, and checkout revalidates/locks the User.
+- Customer deletion is allowed with no orders or only
+  Delivered/Cancelled/Returned orders. Pending/Confirmed/Shipped orders block
+  deletion. Historical contact, delivery, account-identity, and financial
+  snapshots remain unchanged.
 
 Order history uses immutable checkout snapshots. `OrderItem` stores Product
 name and image snapshots; its one-to-one `OrderItemVariant` stores SKU, variant
@@ -163,6 +168,7 @@ Represents both admins and clients — a single table distinguished by role.
 | password_hash | Credential storage                              |
 | phone         | Contact number, also used at checkout auto-fill |
 | role          | `admin` or `client`                             |
+| is_active     | ACTIVE or DISABLED account state                |
 | created_at    | Audit/history                                   |
 
 **Relationships:** One User has many Orders (as the placing customer, only for logged-in checkouts). One User (admin) implicitly manages all Products/Categories/Orders — this is a permission, not a foreign-key relationship.
@@ -248,20 +254,23 @@ Pre-order staging area, used by both guests (session/local) and logged-in client
 
 The confirmed intent to purchase; the durable record admin manages.
 
-| Field            | Purpose                                                           |
-| ---------------- | ----------------------------------------------------------------- |
-| id               | Primary key                                                       |
-| user_id          | FK → User, nullable (null = guest order)                          |
-| guest_name       | Filled only for guest checkout                                    |
-| guest_email      | Filled only for guest checkout                                    |
-| guest_phone      | Filled only for guest checkout                                    |
-| shipping_address | Delivery destination                                              |
-| status           | Enum: Pending, Confirmed, Shipped, Delivered, Returned, Cancelled |
-| total_amount     | Snapshot of order total at placement                              |
-| created_at       | Order placed timestamp                                            |
-| updated_at       | Last status change                                                |
+| Field                        | Purpose                                                           |
+| ---------------------------- | ----------------------------------------------------------------- |
+| id                           | Primary key                                                       |
+| user_id                      | Nullable convenience FK → User; `SetNull` on deletion             |
+| customer_account_id_snapshot | Immutable former account identity; null for guest checkout        |
+| contact_name                 | Immutable checkout customer/guest name                            |
+| contact_email                | Immutable checkout email                                          |
+| contact_phone                | Immutable checkout phone                                          |
+| shipping_address             | Immutable delivery destination                                    |
+| status                       | Enum: Pending, Confirmed, Shipped, Delivered, Returned, Cancelled |
+| total_amount                 | Snapshot of order total at placement                              |
+| created_at                   | Order placed timestamp                                            |
+| updated_at                   | Last status change                                                |
 
-**Relationships:** One Order has many OrderItems. One Order optionally belongs to one User (null for guest orders).
+**Relationships:** One Order has many OrderItems. The live User relation is
+optional and may become null for either a guest order or a deleted customer;
+`customer_account_id_snapshot` distinguishes those cases.
 
 **Why it exists:** This is the system of record for what was bought, at what price, in what state — independent of later product/price changes.
 
@@ -360,9 +369,12 @@ DELETE /admin/categories/:id
 
 POST   /admin/products
 PUT    /admin/products/:id
-POST   /api/products/:id/archive      (archive; reversible)
-POST   /api/products/:id/restore      (restore archived Product)
-DELETE /api/products/:id              (permanent; unordered Products only)
+POST   /api/products/:id/unpublish    (reversible)
+POST   /api/products/:id/publish      (reversible)
+DELETE /api/products/:id              (blocked by non-terminal orders)
+
+PUT    /api/admin/clients/:id         (edit or activate/disable)
+DELETE /api/admin/clients/:id         (blocked by non-terminal orders)
 
 POST   /admin/products/:id/variants
 PUT    /admin/products/:id/variants/:variantId          (edit price/label/stock)
@@ -464,11 +476,13 @@ PUT    /users/me                      (update own profile)
 - A ProductVariant must always belong to exactly one Product — it cannot exist independently.
 - A Client can only cancel an order that (a) belongs to them and (b) is currently Pending; any other combination is rejected.
 - Guest orders can never be cancelled by the guest under any circumstance (no identity to authorize the action).
-- Archiving a Product sets `is_active = false`, changes no SKU stock, and
-  removes it from every public catalog/checkout path until restored.
-- Permanent deletion is allowed only for a Product that has never appeared in
-  an order. Ordered Products return a conflict and must remain archived so
-  cancellation/return can restore SKU inventory.
+- Unpublishing changes no SKU stock and removes the Product from every public
+  catalog and checkout path until published again.
+- Product deletion is rejected while referencing orders are Pending,
+  Confirmed, or Shipped. Terminal history survives through snapshots.
+- Category deletion is rejected while Products remain assigned.
+- Disabled customers cannot authenticate or place orders. Customer deletion is
+  rejected while Pending, Confirmed, or Shipped orders remain.
 - Order history is immutable and permanent — no order is ever hard-deleted regardless of its final status.
 - All quantity/stock changes affecting an order happen atomically with the status change that causes them (decrement with placement; restore with cancel/return) to avoid inconsistent intermediate states.
 
@@ -481,8 +495,8 @@ PUT    /users/me                      (update own profile)
 3. **Admin account creation:** resolved — the development seed upserts one
    administrator from `ADMIN_EMAIL` and `ADMIN_PASSWORD`; public registration
    creates client accounts only.
-4. **Product deletion:** resolved — archive is reversible and primary;
-   permanent deletion is limited to never-ordered Products.
+4. **Product deletion:** resolved — Unpublish is reversible; permanent deletion
+   is allowed only after referencing orders are terminal.
 
 ---
 
@@ -572,8 +586,8 @@ Persistent app listener → authenticated SSE
 | Page                      | Contents                                                                                 | Key interactions                                                                                                                                                                                                  |
 | ------------------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Orders**                | Real-time list of all orders (id, customer name/guest name, total, status, created date) | Filter by status, by client, by date range; click a row to open order detail and change status via `PUT /admin/orders/:id/status`; list updates live per Section 11                                               |
-| **Clients**               | List of all registered (logged-in) users                                                 | View a client's profile and their full order history; read-only in v1 (no admin-side editing of client accounts)                                                                                                  |
-| **Products Management**   | List of all products (name, category, price, active/inactive)                            | Create/edit a product (name, description, price, category, images); within a product, manage its variants — add a variant, edit price/label/stock, enable/disable a variant; view current stock level per variant |
+| **Clients**               | Registered customers, status, identity/contact data, order history and activity          | Edit, activate/disable, guarded permanent deletion, and view orders |
+| **Products Management**   | List of all products (name, category, price, Published/Unpublished)                      | Create/edit, publish/unpublish, guarded permanent deletion, and SKU management |
 | **Categories Management** | List of all categories                                                                   | Create/edit/delete a category (delete blocked or cascabled per business rule if products still reference it — see Section 8's category rule)                                                                      |
 | **Analytics/Dashboard**   | KPI tiles + charts, see 12.1                                                             | Read-only; optional date-range filter for the time-series chart                                                                                                                                                   |
 
@@ -602,9 +616,9 @@ This section restates the entities from Section 2 with explicit primary keys, fo
 
 | Entity             | Primary Key | Foreign Keys                                                    | Unique Constraints                                                                      | Indexes (performance)                                                                                                                                                                           |
 | ------------------ | ----------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **User**           | `id`        | —                                                               | `email` (unique)                                                                        | `email` (login lookup); `role` (admin filtering users)                                                                                                                                          |
+| **User**           | `id`        | —                                                               | `email` (unique)                                                                        | `email`; `role`; (`role`, `is_active`) |
 | **Category**       | `id`        | —                                                               | `slug` (unique)                                                                         | `slug` (category page lookup)                                                                                                                                                                   |
-| **Product**        | `id`        | `category_id` → Category.id                                     | —                                                                                       | `category_id` (browse-by-category); `name`; `is_active` (exclude archived Products from public listings) |
+| **Product**        | `id`        | `category_id` → Category.id                                     | —                                                                                       | `category_id`; `name`; `is_active` (exclude Unpublished Products publicly) |
 | **ProductVariant** | `id`        | `product_id` → Product.id                                       | (`product_id`, `variant_label`) unique — no duplicate variant labels within one product | `product_id` (fetch all variants for a product page); `is_active`                                                                                                                               |
 | **Cart**           | `id`        | `user_id` → User.id (nullable)                                  | —                                                                                       | `user_id` (fetch a logged-in user's cart)                                                                                                                                                       |
 | **CartItem**       | `id`        | `cart_id` → Cart.id; `product_variant_id` → ProductVariant.id   | (`cart_id`, `product_variant_id`) unique — one row per variant per cart                 | `cart_id`                                                                                                                                                                                       |

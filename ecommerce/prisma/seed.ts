@@ -29,11 +29,19 @@ type SeedProduct = {
   variants: SeedVariant[];
 };
 
-function combinationKey(selections: Record<string, string>, optionNames: string[]) {
-  return optionNames.map((name) => `${name}=${selections[name] ?? ""}`).join("|");
+function combinationKey(
+  selections: Record<string, string>,
+  optionNames: string[],
+) {
+  return optionNames
+    .map((name) => `${name}=${selections[name] ?? ""}`)
+    .join("|");
 }
 
-async function findSeedProduct(tx: Prisma.TransactionClient, seed: SeedProduct) {
+async function findSeedProduct(
+  tx: Prisma.TransactionClient,
+  seed: SeedProduct,
+) {
   const existingVariant = await tx.productVariant.findFirst({
     where: { sku: { in: seed.variants.map((variant) => variant.sku) } },
     select: { productId: true },
@@ -79,14 +87,24 @@ async function upsertSeedProduct(seed: SeedProduct) {
     const optionNames = (seed.options ?? []).map((option) => option.name);
     const optionValueIds = new Map<string, number>();
 
-    for (const [optionPosition, optionSeed] of Array.from((seed.options ?? []).entries())) {
+    for (const [optionPosition, optionSeed] of Array.from(
+      (seed.options ?? []).entries(),
+    )) {
       const option = await tx.productOption.upsert({
-        where: { productId_name: { productId: product.id, name: optionSeed.name } },
-        create: { productId: product.id, name: optionSeed.name, position: optionPosition },
+        where: {
+          productId_name: { productId: product.id, name: optionSeed.name },
+        },
+        create: {
+          productId: product.id,
+          name: optionSeed.name,
+          position: optionPosition,
+        },
         update: { position: optionPosition },
       });
 
-      for (const [valuePosition, value] of Array.from(optionSeed.values.entries())) {
+      for (const [valuePosition, value] of Array.from(
+        optionSeed.values.entries(),
+      )) {
         const optionValue = await tx.productOptionValue.upsert({
           where: { optionId_value: { optionId: option.id, value } },
           create: { optionId: option.id, value, position: valuePosition },
@@ -102,31 +120,44 @@ async function upsertSeedProduct(seed: SeedProduct) {
         select: { productId: true },
       });
       if (existingSku && existingSku.productId !== product.id) {
-        throw new Error(`Seed SKU ${variantSeed.sku} already belongs to another Product.`);
+        throw new Error(
+          `Seed SKU ${variantSeed.sku} already belongs to another Product.`,
+        );
       }
 
       const selections = variantSeed.selections ?? {};
       const selectedNames = Object.keys(selections);
       if (
         selectedNames.length !== optionNames.length ||
-        optionNames.some((name) => !Object.prototype.hasOwnProperty.call(selections, name))
+        optionNames.some(
+          (name) => !Object.prototype.hasOwnProperty.call(selections, name),
+        )
       ) {
-        throw new Error(`${variantSeed.sku} must select one value for every Product option.`);
+        throw new Error(
+          `${variantSeed.sku} must select one value for every Product option.`,
+        );
       }
 
       const selectedValueIds = optionNames.map((name) => {
         const id = optionValueIds.get(`${name}\u0000${selections[name]}`);
-        if (!id) throw new Error(`${variantSeed.sku} uses an unknown value for ${name}.`);
+        if (!id)
+          throw new Error(
+            `${variantSeed.sku} uses an unknown value for ${name}.`,
+          );
         return id;
       });
-      const key = optionNames.length ? combinationKey(selections, optionNames) : null;
+      const key = optionNames.length
+        ? combinationKey(selections, optionNames)
+        : null;
 
       const legacyVariant = existingSku
         ? null
         : await tx.productVariant.findFirst({
             where: {
               productId: product.id,
-              variantLabel: { in: variantSeed.legacyLabels ?? [variantSeed.label] },
+              variantLabel: {
+                in: variantSeed.legacyLabels ?? [variantSeed.label],
+              },
               sku: { startsWith: `LEGACY-PRODUCT-${product.id}-VARIANT-` },
             },
             orderBy: { id: "asc" },
@@ -152,7 +183,9 @@ async function upsertSeedProduct(seed: SeedProduct) {
             update: variantData,
           });
 
-      await tx.productVariantOptionValue.deleteMany({ where: { variantId: variant.id } });
+      await tx.productVariantOptionValue.deleteMany({
+        where: { variantId: variant.id },
+      });
       if (selectedValueIds.length) {
         await tx.productVariantOptionValue.createMany({
           data: selectedValueIds.map((optionValueId) => ({
@@ -176,7 +209,9 @@ async function upsertSeedProduct(seed: SeedProduct) {
     return tx.product.findUniqueOrThrow({
       where: { id: product.id },
       include: {
-        variants: { where: { sku: { in: seed.variants.map((variant) => variant.sku) } } },
+        variants: {
+          where: { sku: { in: seed.variants.map((variant) => variant.sku) } },
+        },
       },
     });
   });
@@ -186,7 +221,9 @@ async function main() {
   const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
   const adminPassword = process.env.ADMIN_PASSWORD;
   if (!adminEmail || !adminPassword) {
-    throw new Error("ADMIN_EMAIL and ADMIN_PASSWORD must be set before running the seed.");
+    throw new Error(
+      "ADMIN_EMAIL and ADMIN_PASSWORD must be set before running the seed.",
+    );
   }
   if (adminPassword.length < 8) {
     throw new Error("ADMIN_PASSWORD must contain at least 8 characters.");
@@ -201,10 +238,12 @@ async function main() {
       passwordHash: adminPasswordHash,
       phone: "000000",
       role: Role.ADMIN,
+      isActive: true,
     },
     update: {
       passwordHash: adminPasswordHash,
       role: Role.ADMIN,
+      isActive: true,
     },
   });
 
@@ -256,7 +295,8 @@ async function main() {
     {
       categoryId: apparel.id,
       name: "Red T-Shirt",
-      description: "100% cotton crew-neck T-shirt, machine washable, true to size.",
+      description:
+        "100% cotton crew-neck T-shirt, machine washable, true to size.",
       basePrice: "15.00",
       productType: ProductType.CONFIGURABLE,
       images: ["https://res.cloudinary.com/demo/image/upload/red-tshirt.jpg"],
@@ -322,10 +362,13 @@ async function main() {
     {
       categoryId: electronics.id,
       name: "Wireless Mouse",
-      description: "2.4GHz wireless mouse with adjustable DPI and USB receiver.",
+      description:
+        "2.4GHz wireless mouse with adjustable DPI and USB receiver.",
       basePrice: "22.50",
       productType: ProductType.CONFIGURABLE,
-      images: ["https://res.cloudinary.com/demo/image/upload/wireless-mouse.jpg"],
+      images: [
+        "https://res.cloudinary.com/demo/image/upload/wireless-mouse.jpg",
+      ],
       options: [{ name: "Color", values: ["Black", "White"] }],
       variants: [
         {
@@ -347,7 +390,8 @@ async function main() {
     {
       categoryId: electronics.id,
       name: "Nova Smartphone",
-      description: "5G smartphone with an OLED display and all-day battery life.",
+      description:
+        "5G smartphone with an OLED display and all-day battery life.",
       basePrice: "499.00",
       productType: ProductType.CONFIGURABLE,
       images: ["https://res.cloudinary.com/demo/image/upload/smartphone.jpg"],
@@ -382,7 +426,8 @@ async function main() {
     {
       categoryId: electronics.id,
       name: "Bluetooth Speaker",
-      description: "Portable speaker with 10-hour battery life and water resistance.",
+      description:
+        "Portable speaker with 10-hour battery life and water resistance.",
       basePrice: "34.99",
       productType: ProductType.SIMPLE,
       images: ["https://res.cloudinary.com/demo/image/upload/bt-speaker.jpg"],
@@ -418,11 +463,18 @@ async function main() {
   const seeded = [];
   for (const product of products) seeded.push(await upsertSeedProduct(product));
 
-  console.log("Development seed complete (orders and historical data unchanged):");
+  console.log(
+    "Development seed complete (orders and historical data unchanged):",
+  );
   console.log("  Admin account: created or updated from environment");
   for (const product of seeded) {
-    const totalStock = product.variants.reduce((sum, variant) => sum + variant.stockQuantity, 0);
-    console.log(`  ${product.name}: ${product.variants.length} SKU(s), ${totalStock} total stock`);
+    const totalStock = product.variants.reduce(
+      (sum, variant) => sum + variant.stockQuantity,
+      0,
+    );
+    console.log(
+      `  ${product.name}: ${product.variants.length} SKU(s), ${totalStock} total stock`,
+    );
   }
 }
 

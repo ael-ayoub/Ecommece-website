@@ -11,7 +11,8 @@ export async function GET() {
       status: "ready",
       database: "connected",
       timestamp,
-      version: process.env.APP_VERSION ?? process.env.npm_package_version ?? "unknown",
+      version:
+        process.env.APP_VERSION ?? process.env.npm_package_version ?? "unknown",
     });
   } catch {
     return NextResponse.json(

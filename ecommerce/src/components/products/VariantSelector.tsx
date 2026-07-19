@@ -27,8 +27,12 @@ export function VariantSelector({
 }: Props) {
   const { addItem } = useCart();
   const selectableVariants = variants; // disabled/out-of-stock stay visible but non-selectable
-  const firstSelectable = variants.find((v) => v.isActive && v.stockQuantity > 0);
-  const structured = variants.some((variant) => (variant.optionValues?.length ?? 0) > 0);
+  const firstSelectable = variants.find(
+    (v) => v.isActive && v.stockQuantity > 0,
+  );
+  const structured = variants.some(
+    (variant) => (variant.optionValues?.length ?? 0) > 0,
+  );
   const [selectedId, setSelectedId] = useState<number | null>(
     productType === "SIMPLE" ? (firstSelectable?.id ?? null) : null,
   );
@@ -68,7 +72,8 @@ export function VariantSelector({
         variant.stockQuantity > 0 &&
         (variant.optionValues?.length ?? 0) === optionDefinitions.length &&
         (variant.optionValues ?? []).every(
-          ({ optionValue }) => next[optionValue.option.name] === optionValue.value,
+          ({ optionValue }) =>
+            next[optionValue.option.name] === optionValue.value,
         ),
     );
     setSelectedId(match?.id ?? null);
@@ -173,7 +178,11 @@ export function VariantSelector({
                   disabled={disabled}
                   onClick={() => selectVariant(v)}
                   title={
-                    !v.isActive ? "Unavailable" : v.stockQuantity === 0 ? "Out of stock" : undefined
+                    !v.isActive
+                      ? "Unavailable"
+                      : v.stockQuantity === 0
+                        ? "Out of stock"
+                        : undefined
                   }
                   className={`rounded-md border px-3 py-1.5 text-sm ${
                     disabled
@@ -191,7 +200,9 @@ export function VariantSelector({
           {selected && (
             <p className="mt-2 text-sm text-gray-600">
               {selected.variantLabel}
-              {showExactStock ? ` — ${selected.stockQuantity} left` : " — Available"}
+              {showExactStock
+                ? ` — ${selected.stockQuantity} left`
+                : " — Available"}
             </p>
           )}
         </div>
@@ -230,7 +241,8 @@ export function VariantSelector({
         </>
       ) : (
         <p className="text-sm font-medium text-red-600">
-          {structured && Object.keys(selections).length < optionDefinitions.length
+          {structured &&
+          Object.keys(selections).length < optionDefinitions.length
             ? "Select all options"
             : "Out of stock or unavailable"}
         </p>

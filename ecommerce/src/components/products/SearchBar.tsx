@@ -29,7 +29,10 @@ export function SearchBar() {
         placeholder="Search products..."
         aria-label="Search products"
       />
-      <button type="submit" className="rounded-md bg-gray-900 px-4 py-2 text-sm text-white">
+      <button
+        type="submit"
+        className="rounded-md bg-gray-900 px-4 py-2 text-sm text-white"
+      >
         Search
       </button>
     </form>

@@ -47,9 +47,12 @@ export default function CheckoutPage() {
   function validate(): boolean {
     const next: FieldErrors = {};
     if (!contactName.trim()) next.contactName = "Full name is required";
-    if (!/^\S+@\S+\.\S+$/.test(contactEmail)) next.contactEmail = "Enter a valid email address";
-    if (contactPhone.trim().length < 6) next.contactPhone = "Enter a valid phone number";
-    if (!shippingAddress.trim()) next.shippingAddress = "Delivery address is required";
+    if (!/^\S+@\S+\.\S+$/.test(contactEmail))
+      next.contactEmail = "Enter a valid email address";
+    if (contactPhone.trim().length < 6)
+      next.contactPhone = "Enter a valid phone number";
+    if (!shippingAddress.trim())
+      next.shippingAddress = "Delivery address is required";
     setErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -86,7 +89,11 @@ export default function CheckoutPage() {
         setPlacedOrder(order);
       }
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Order failed to place. Please try again.");
+      setFormError(
+        err instanceof Error
+          ? err.message
+          : "Order failed to place. Please try again.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -99,12 +106,18 @@ export default function CheckoutPage() {
   if (placedOrder) {
     return (
       <div className="mx-auto max-w-lg">
-        <h1 className="mb-2 text-2xl font-bold">✓ Order placed successfully!</h1>
+        <h1 className="mb-2 text-2xl font-bold">
+          ✓ Order placed successfully!
+        </h1>
         <p className="mb-6 text-sm text-gray-600">
-          Order #{placedOrder.id} — {new Date(placedOrder.createdAt).toLocaleString()}
+          Order #{placedOrder.id} —{" "}
+          {new Date(placedOrder.createdAt).toLocaleString()}
         </p>
 
-        <OrderItemsTable items={placedOrder.items} total={placedOrder.totalAmount} />
+        <OrderItemsTable
+          items={placedOrder.items}
+          total={placedOrder.totalAmount}
+        />
 
         <p className="mt-4 text-sm text-gray-600">
           Delivery Address: {placedOrder.shippingAddress}
@@ -115,7 +128,10 @@ export default function CheckoutPage() {
           <p>No order tracking is available for guest checkouts.</p>
         </div>
 
-        <Link href="/products" className="mt-6 inline-block text-sm font-medium underline">
+        <Link
+          href="/products"
+          className="mt-6 inline-block text-sm font-medium underline"
+        >
           Continue Shopping
         </Link>
       </div>
@@ -139,12 +155,18 @@ export default function CheckoutPage() {
         <h1 className="text-xl font-bold">Delivery Information</h1>
 
         {formError && (
-          <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>
+          <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+            {formError}
+          </p>
         )}
 
         <div>
           <label className="mb-1 block text-sm font-medium">Full Name *</label>
-          <Input value={contactName} onChange={(e) => setContactName(e.target.value)} required />
+          <Input
+            value={contactName}
+            onChange={(e) => setContactName(e.target.value)}
+            required
+          />
           <FieldError message={errors.contactName} />
         </div>
 
@@ -161,12 +183,18 @@ export default function CheckoutPage() {
 
         <div>
           <label className="mb-1 block text-sm font-medium">Phone *</label>
-          <Input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} required />
+          <Input
+            value={contactPhone}
+            onChange={(e) => setContactPhone(e.target.value)}
+            required
+          />
           <FieldError message={errors.contactPhone} />
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium">Delivery Address *</label>
+          <label className="mb-1 block text-sm font-medium">
+            Delivery Address *
+          </label>
           <textarea
             value={shippingAddress}
             onChange={(e) => setShippingAddress(e.target.value)}
@@ -178,7 +206,9 @@ export default function CheckoutPage() {
         </div>
 
         <p className="text-sm font-medium">Payment: Cash on Delivery</p>
-        <p className="text-xs text-gray-500">You only pay when you receive your order.</p>
+        <p className="text-xs text-gray-500">
+          You only pay when you receive your order.
+        </p>
 
         <Button type="submit" disabled={submitting}>
           {submitting ? "Placing order…" : "Place Order"}

@@ -1,14 +1,21 @@
 import { db } from "@/lib/db";
 import { Prisma, OrderStatus } from "@prisma/client";
-import { lockAndDecrementStock, restoreStock } from "@/services/inventory.service";
-import { ConflictError, NotFoundError } from "@/lib/errors";
+import {
+  lockAndDecrementStock,
+  restoreStock,
+} from "@/services/inventory.service";
+import { ConflictError, NotFoundError, UnauthorizedError } from "@/lib/errors";
 import type { OrderCreateInput } from "@/lib/validators";
 import type { OrderStatusValue } from "@/types/order";
 import { checkoutFingerprint, normalizeCheckoutItems } from "@/domain/checkout";
-import { canTransitionOrder, transitionRestoresStock } from "@/domain/order-status";
+import {
+  canTransitionOrder,
+  transitionRestoresStock,
+} from "@/domain/order-status";
 import { ensureOutboxDispatcher } from "@/lib/realtime/outbox";
 
 const orderInclude = {
+  user: { select: { id: true } },
   items: {
     include: {
       product: { select: { id: true, name: true, isActive: true } },
@@ -38,7 +45,10 @@ interface LockedOrderRow {
 // order's quantity instead of 1x). FOR UPDATE here means the second
 // transaction blocks until the first commits, then reads the *already
 // updated* status and correctly rejects instead of double-processing.
-async function lockOrderForUpdate(tx: Tx, orderId: number): Promise<LockedOrderRow | null> {
+async function lockOrderForUpdate(
+  tx: Tx,
+  orderId: number,
+): Promise<LockedOrderRow | null> {
   const rows = await tx.$queryRaw<LockedOrderRow[]>`
     SELECT id, "userId", status FROM "Order" WHERE id = ${orderId} FOR UPDATE
   `;
@@ -52,24 +62,45 @@ export async function createOrder(
 ) {
   const items = normalizeCheckoutItems(input.items);
   const fingerprint = checkoutFingerprint({ ...input, items }, userId);
-  const existing = await db.order.findUnique({ where: { idempotencyKey }, include: orderInclude });
+  const existing = await db.order.findUnique({
+    where: { idempotencyKey },
+    include: orderInclude,
+  });
   if (existing) {
     if (existing.idempotencyFingerprint !== fingerprint) {
-      throw new ConflictError("This idempotency key was already used for different checkout data.");
+      throw new ConflictError(
+        "This idempotency key was already used for different checkout data.",
+      );
     }
     return { order: existing, replayed: true };
   }
 
   try {
     const order = await db.$transaction(async (tx) => {
+      if (userId !== null) {
+        const users = await tx.$queryRaw<Array<{ id: number }>>`
+          SELECT id FROM "User"
+          WHERE id = ${userId} AND "isActive" = true
+          FOR UPDATE
+        `;
+        if (users.length === 0) {
+          throw new UnauthorizedError(
+            "Your account is disabled or no longer exists.",
+          );
+        }
+      }
       const lines = await lockAndDecrementStock(tx, items);
       const totalAmount = lines
-        .reduce((sum, line) => sum + Number(line.unitPriceSnapshot) * line.quantity, 0)
+        .reduce(
+          (sum, line) => sum + Number(line.unitPriceSnapshot) * line.quantity,
+          0,
+        )
         .toFixed(2);
 
       const created = await tx.order.create({
         data: {
           userId,
+          customerAccountIdSnapshot: userId,
           contactName: input.contactName,
           contactEmail: input.contactEmail,
           contactPhone: input.contactPhone,
@@ -119,16 +150,29 @@ export async function createOrder(
     ensureOutboxDispatcher();
     return { order, replayed: false };
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      const raced = await db.order.findUnique({ where: { idempotencyKey }, include: orderInclude });
-      if (raced?.idempotencyFingerprint === fingerprint) return { order: raced, replayed: true };
-      throw new ConflictError("This idempotency key was already used for different checkout data.");
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      const raced = await db.order.findUnique({
+        where: { idempotencyKey },
+        include: orderInclude,
+      });
+      if (raced?.idempotencyFingerprint === fingerprint)
+        return { order: raced, replayed: true };
+      throw new ConflictError(
+        "This idempotency key was already used for different checkout data.",
+      );
     }
     throw error;
   }
 }
 
-export async function listOrdersForUser(userId: number, page = 1, pageSize = 20) {
+export async function listOrdersForUser(
+  userId: number,
+  page = 1,
+  pageSize = 20,
+) {
   const where = { userId };
   const [data, totalItems] = await Promise.all([
     db.order.findMany({
@@ -147,7 +191,10 @@ export async function listOrdersForUser(userId: number, page = 1, pageSize = 20)
 // nonexistent order and one that belongs to someone else, so a guessed ID
 // never confirms whether that order exists.
 export async function getOrderForUser(orderId: number, userId: number) {
-  const order = await db.order.findUnique({ where: { id: orderId }, include: orderInclude });
+  const order = await db.order.findUnique({
+    where: { id: orderId },
+    include: orderInclude,
+  });
   if (!order || order.userId !== userId) {
     throw new NotFoundError("Order not found.");
   }
@@ -179,8 +226,14 @@ export async function cancelOrderAsOwner(orderId: number, userId: number) {
     // nothing to restore to, but the order itself still gets cancelled.
     const restorable = items
       .map((item) => item.variant)
-      .filter((v): v is NonNullable<typeof v> => v !== null && v.productVariantId !== null)
-      .map((v) => ({ variantId: v.productVariantId as number, quantity: v.quantity }));
+      .filter(
+        (v): v is NonNullable<typeof v> =>
+          v !== null && v.productVariantId !== null,
+      )
+      .map((v) => ({
+        variantId: v.productVariantId as number,
+        quantity: v.quantity,
+      }));
 
     await restoreStock(tx, restorable);
 
@@ -216,7 +269,10 @@ export async function cancelOrderAsOwner(orderId: number, userId: number) {
 
 // Admin ownership bypass — admin can view any order regardless of who placed it.
 export async function getOrderById(orderId: number) {
-  const order = await db.order.findUnique({ where: { id: orderId }, include: orderInclude });
+  const order = await db.order.findUnique({
+    where: { id: orderId },
+    include: orderInclude,
+  });
   if (!order) throw new NotFoundError("Order not found.");
   return order;
 }
@@ -238,8 +294,18 @@ export async function listOrdersAdmin(params: AdminOrderListParams) {
     ...(params.search
       ? {
           OR: [
-            { contactName: { contains: params.search, mode: "insensitive" as const } },
-            { contactEmail: { contains: params.search, mode: "insensitive" as const } },
+            {
+              contactName: {
+                contains: params.search,
+                mode: "insensitive" as const,
+              },
+            },
+            {
+              contactEmail: {
+                contains: params.search,
+                mode: "insensitive" as const,
+              },
+            },
           ],
         }
       : {}),
@@ -266,7 +332,11 @@ export async function listOrdersAdmin(params: AdminOrderListParams) {
 }
 
 export async function listRecentOrders(limit: number) {
-  return db.order.findMany({ orderBy: { createdAt: "desc" }, take: limit, include: orderInclude });
+  return db.order.findMany({
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    include: orderInclude,
+  });
 }
 
 // Admin-driven status change: an admin (and only an admin — enforced by
@@ -298,10 +368,15 @@ export async function updateOrderStatusAsAdmin(
       return unchanged;
     }
     if (!canTransitionOrder(currentStatus, nextStatus)) {
-      throw new ConflictError(`Order cannot move from ${currentStatus} to ${nextStatus}.`);
+      throw new ConflictError(
+        `Order cannot move from ${currentStatus} to ${nextStatus}.`,
+      );
     }
     if (transitionRestoresStock(currentStatus, nextStatus)) {
-      const items = await tx.orderItem.findMany({ where: { orderId }, include: { variant: true } });
+      const items = await tx.orderItem.findMany({
+        where: { orderId },
+        include: { variant: true },
+      });
       const restorable = items
         .map((item) => item.variant)
         .filter((variant): variant is NonNullable<typeof variant> =>

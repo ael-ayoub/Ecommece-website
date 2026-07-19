@@ -8,24 +8,33 @@ import { RevenueChart } from "@/components/admin/analytics/RevenueChart";
 import { OrdersByStatusChart } from "@/components/admin/analytics/OrdersByStatusChart";
 import { RecentOrders } from "@/components/admin/analytics/RecentOrders";
 import { formatCurrency } from "@/lib/format";
-import type { DashboardSummaryDto, OrdersByStatusDto, RevenuePointDto } from "@/types/analytics";
+import type {
+  DashboardSummaryDto,
+  OrdersByStatusDto,
+  RevenuePointDto,
+} from "@/types/analytics";
 
 export default function AdminDashboardPage() {
   const { data: summary, isLoading: loadingSummary } = useQuery({
     queryKey: ["admin", "analytics", "summary"],
-    queryFn: () => apiFetch<DashboardSummaryDto>("/api/admin/analytics/summary"),
+    queryFn: () =>
+      apiFetch<DashboardSummaryDto>("/api/admin/analytics/summary"),
   });
 
   const { data: statusData } = useQuery({
     queryKey: ["admin", "analytics", "orders-by-status"],
     queryFn: () =>
-      apiFetch<{ ordersByStatus: OrdersByStatusDto }>("/api/admin/analytics/orders-by-status"),
+      apiFetch<{ ordersByStatus: OrdersByStatusDto }>(
+        "/api/admin/analytics/orders-by-status",
+      ),
   });
 
   const { data: revenueData } = useQuery({
     queryKey: ["admin", "analytics", "revenue-over-time"],
     queryFn: () =>
-      apiFetch<{ points: RevenuePointDto[] }>("/api/admin/analytics/revenue-over-time"),
+      apiFetch<{ points: RevenuePointDto[] }>(
+        "/api/admin/analytics/revenue-over-time",
+      ),
   });
 
   return (
@@ -37,7 +46,10 @@ export default function AdminDashboardPage() {
       ) : (
         <>
           <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <KPICard label="Total Revenue" value={formatCurrency(summary?.totalRevenue ?? "0")} />
+            <KPICard
+              label="Total Revenue"
+              value={formatCurrency(summary?.totalRevenue ?? "0")}
+            />
             <KPICard label="Delivered" value={summary?.deliveredCount ?? 0} />
             <KPICard label="Pending" value={summary?.pendingCount ?? 0} />
             <KPICard label="Cancelled" value={summary?.cancelledCount ?? 0} />
@@ -50,7 +62,9 @@ export default function AdminDashboardPage() {
             </div>
             <div className="rounded-lg border border-gray-200 p-4">
               <h2 className="mb-3 font-semibold">Orders by Status</h2>
-              {statusData && <OrdersByStatusChart counts={statusData.ordersByStatus} />}
+              {statusData && (
+                <OrdersByStatusChart counts={statusData.ordersByStatus} />
+              )}
             </div>
           </div>
 

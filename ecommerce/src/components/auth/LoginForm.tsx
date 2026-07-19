@@ -27,7 +27,8 @@ export function LoginForm() {
 
   function validate(): boolean {
     const next: FieldErrors = {};
-    if (!/^\S+@\S+\.\S+$/.test(email)) next.email = "Enter a valid email address";
+    if (!/^\S+@\S+\.\S+$/.test(email))
+      next.email = "Enter a valid email address";
     if (!password) next.password = "Password is required";
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -47,7 +48,8 @@ export function LoginForm() {
       queryClient.setQueryData(["auth", "me"], { user: data.user });
 
       const redirect = searchParams.get("redirect");
-      const destination = redirect ?? (data.user.role === "ADMIN" ? "/admin/products" : "/");
+      const destination =
+        redirect ?? (data.user.role === "ADMIN" ? "/admin/products" : "/");
       router.push(destination);
       router.refresh();
     } catch (err) {
@@ -62,12 +64,19 @@ export function LoginForm() {
       <h1 className="text-xl font-bold">Log in</h1>
 
       {formError && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>
+        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+          {formError}
+        </p>
       )}
 
       <div>
         <label className="mb-1 block text-sm font-medium">Email *</label>
-        <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <Input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
         <FieldError message={errors.email} />
       </div>
 

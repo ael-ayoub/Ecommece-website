@@ -25,10 +25,13 @@ export default function AdminOrderDetailPage({ params }: Props) {
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin", "order", orderId],
-    queryFn: () => apiFetch<{ order: OrderDto }>(`/api/admin/orders/${orderId}`),
+    queryFn: () =>
+      apiFetch<{ order: OrderDto }>(`/api/admin/orders/${orderId}`),
   });
 
-  const [pendingStatus, setPendingStatus] = useState<OrderStatusValue | null>(null);
+  const [pendingStatus, setPendingStatus] = useState<OrderStatusValue | null>(
+    null,
+  );
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,7 +48,9 @@ export default function AdminOrderDetailPage({ params }: Props) {
       queryClient.invalidateQueries({ queryKey: ["admin", "analytics"] });
       setPendingStatus(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update order status.");
+      setError(
+        err instanceof Error ? err.message : "Failed to update order status.",
+      );
     } finally {
       setUpdating(false);
     }
@@ -66,12 +71,18 @@ export default function AdminOrderDetailPage({ params }: Props) {
   if (!data) return <p className="text-red-600">Order not found.</p>;
 
   const { order } = data;
-  const restoreUnits = order.items.reduce((sum, item) => sum + (item.variant?.quantity ?? 0), 0);
+  const restoreUnits = order.items.reduce(
+    (sum, item) => sum + (item.variant?.quantity ?? 0),
+    0,
+  );
   const allowedNext = getAdminOrderTransitions(order.status);
 
   return (
     <div className="max-w-2xl">
-      <Link href="/admin/orders" className="mb-4 inline-block text-sm underline">
+      <Link
+        href="/admin/orders"
+        className="mb-4 inline-block text-sm underline"
+      >
         ← Back to Orders
       </Link>
 
@@ -83,33 +94,62 @@ export default function AdminOrderDetailPage({ params }: Props) {
       <div className="mb-6 text-sm text-gray-600">
         <p>Placed: {new Date(order.createdAt).toLocaleString()}</p>
         <p>
-          {order.userId ? "Registered client" : "Guest"} — {order.contactName} ·{" "}
-          {order.contactEmail} · {order.contactPhone}
+          {order.user ? (
+            <>
+              Registered customer —{" "}
+              <Link
+                href={`/admin/clients/${order.user.id}`}
+                className="underline"
+              >
+                {order.contactName}
+              </Link>
+            </>
+          ) : order.customerAccountIdSnapshot ? (
+            <>
+              {order.contactName} ·{" "}
+              <span className="text-gray-500">Customer was deleted</span>
+            </>
+          ) : (
+            <>Guest — {order.contactName}</>
+          )}{" "}
+          · {order.contactEmail} · {order.contactPhone}
         </p>
         <p>Delivery Address: {order.shippingAddress}</p>
+        <p>Payment: Cash on Delivery</p>
       </div>
 
       <div className="mb-8">
         <OrderStatusTimeline status={order.status} />
       </div>
 
-      <OrderItemsTable items={order.items} total={order.totalAmount} />
+      <OrderItemsTable
+        items={order.items}
+        total={order.totalAmount}
+        productLinkBase="/admin/products"
+      />
 
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
       {pendingStatus ? (
         <div className="mt-6 rounded-md border border-red-200 bg-red-50 p-4">
           <p className="mb-3 text-sm">
-            Marking this order as {ORDER_STATUS_LABELS[pendingStatus]} will restore {restoreUnits}{" "}
-            unit{restoreUnits === 1 ? "" : "s"} to stock across {order.items.length} item
+            Marking this order as {ORDER_STATUS_LABELS[pendingStatus]} will
+            restore {restoreUnits} unit{restoreUnits === 1 ? "" : "s"} to stock
+            across {order.items.length} item
             {order.items.length === 1 ? "" : "s"}. Continue?
           </p>
           <div className="flex gap-2">
             <Button variant="secondary" onClick={() => setPendingStatus(null)}>
               Go Back
             </Button>
-            <Button variant="danger" onClick={() => applyStatus(pendingStatus)} disabled={updating}>
-              {updating ? "Updating…" : `Yes, Mark ${ORDER_STATUS_LABELS[pendingStatus]}`}
+            <Button
+              variant="danger"
+              onClick={() => applyStatus(pendingStatus)}
+              disabled={updating}
+            >
+              {updating
+                ? "Updating…"
+                : `Yes, Mark ${ORDER_STATUS_LABELS[pendingStatus]}`}
             </Button>
           </div>
         </div>
@@ -118,7 +158,11 @@ export default function AdminOrderDetailPage({ params }: Props) {
           {allowedNext
             .filter((s) => !STOCK_RESTORING_STATUSES.includes(s))
             .map((s) => (
-              <Button key={s} onClick={() => handleStatusClick(s)} disabled={updating}>
+              <Button
+                key={s}
+                onClick={() => handleStatusClick(s)}
+                disabled={updating}
+              >
                 Mark {ORDER_STATUS_LABELS[s]}
               </Button>
             ))}

@@ -13,7 +13,11 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const admin = await requireAdmin();
     const body = await req.json();
     const { status } = orderStatusUpdateSchema.parse(body);
-    const order = await updateOrderStatusAsAdmin(Number(params.id), status, admin.id);
+    const order = await updateOrderStatusAsAdmin(
+      Number(params.id),
+      status,
+      admin.id,
+    );
     return NextResponse.json({ order });
   } catch (err) {
     return handleApiError(err);

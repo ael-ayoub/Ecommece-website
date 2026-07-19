@@ -6,7 +6,10 @@ import {
   normalizeTemplateText,
   rankOptionTemplates,
 } from "@/domain/option-template";
-import type { OptionTemplateCreateInput, OptionTemplateUpdateInput } from "@/lib/validators";
+import type {
+  OptionTemplateCreateInput,
+  OptionTemplateUpdateInput,
+} from "@/lib/validators";
 
 const templateInclude = {
   values: { where: { isActive: true }, orderBy: { position: "asc" as const } },
@@ -15,8 +18,13 @@ const templateInclude = {
 } as const;
 
 function duplicateConflict(error: unknown): never {
-  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-    throw new ConflictError("A template or value with the same normalized name already exists.");
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  ) {
+    throw new ConflictError(
+      "A template or value with the same normalized name already exists.",
+    );
   }
   throw error;
 }
@@ -32,16 +40,22 @@ export async function listOptionTemplates(
         { ownerType: OptionTemplateOwnerType.SYSTEM },
         { ownerType: OptionTemplateOwnerType.USER, ownerUserId: userId },
       ],
-      ...(params.search ? { name: { contains: params.search, mode: "insensitive" as const } } : {}),
+      ...(params.search
+        ? { name: { contains: params.search, mode: "insensitive" as const } }
+        : {}),
     },
     include: templateInclude,
   });
 
   return rankOptionTemplates(
     templates.map((template) => {
-      const preference = template.preferences.find((item) => item.userId === userId);
+      const preference = template.preferences.find(
+        (item) => item.userId === userId,
+      );
       const recommendation = params.categoryId
-        ? template.categories.find((item) => item.categoryId === params.categoryId)
+        ? template.categories.find(
+            (item) => item.categoryId === params.categoryId,
+          )
         : undefined;
       return {
         ...template,
@@ -71,7 +85,9 @@ export async function createPersonalOptionTemplate(
           isActive: true,
           OR: [{ ownerType: "SYSTEM" }, { ownerUserId: userId }],
         },
-        include: { values: { where: { isActive: true }, orderBy: { position: "asc" } } },
+        include: {
+          values: { where: { isActive: true }, orderBy: { position: "asc" } },
+        },
       });
       if (!source) throw new NotFoundError("Template not found.");
       sourceValues = source.values.map((value) => ({
@@ -96,7 +112,9 @@ export async function createPersonalOptionTemplate(
       return {
         value,
         normalizedValue,
-        metadata: item.metadata ? (item.metadata as Prisma.InputJsonValue) : undefined,
+        metadata: item.metadata
+          ? (item.metadata as Prisma.InputJsonValue)
+          : undefined,
         isActive: item.isActive,
         position,
       };
@@ -160,14 +178,18 @@ export async function updatePersonalOptionTemplate(
               }
             : {}),
           ...(input.inputType ? { inputType: input.inputType } : {}),
-          ...(input.description !== undefined ? { description: input.description } : {}),
+          ...(input.description !== undefined
+            ? { description: input.description }
+            : {}),
           ...(input.values
             ? {
                 values: {
                   create: input.values.map((item, position) => ({
                     value: normalizeTemplateText(item.value),
                     normalizedValue: normalizedTemplateKey(item.value),
-                    metadata: item.metadata ? (item.metadata as Prisma.InputJsonValue) : undefined,
+                    metadata: item.metadata
+                      ? (item.metadata as Prisma.InputJsonValue)
+                      : undefined,
                     isActive: item.isActive,
                     position,
                   })),
@@ -193,9 +215,15 @@ export async function updatePersonalOptionTemplate(
   }
 }
 
-export async function disablePersonalOptionTemplate(userId: number, templateId: number) {
+export async function disablePersonalOptionTemplate(
+  userId: number,
+  templateId: number,
+) {
   await requireOwnedTemplate(userId, templateId);
-  return db.optionTemplate.update({ where: { id: templateId }, data: { isActive: false } });
+  return db.optionTemplate.update({
+    where: { id: templateId },
+    data: { isActive: false },
+  });
 }
 
 export async function setOptionTemplatePinned(
@@ -218,7 +246,10 @@ export async function setOptionTemplatePinned(
   });
 }
 
-export async function recordOptionTemplateUsage(userId: number, templateIds: number[]) {
+export async function recordOptionTemplateUsage(
+  userId: number,
+  templateIds: number[],
+) {
   const uniqueIds = Array.from(new Set(templateIds));
   await db.$transaction(
     uniqueIds.map((templateId) =>

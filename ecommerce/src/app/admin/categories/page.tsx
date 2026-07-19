@@ -31,11 +31,16 @@ export default function AdminCategoriesPage() {
       return;
     }
     try {
-      await apiFetch("/api/categories", { method: "POST", body: JSON.stringify({ name }) });
+      await apiFetch("/api/categories", {
+        method: "POST",
+        body: JSON.stringify({ name }),
+      });
       setName("");
       invalidate();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create category.");
+      setError(
+        err instanceof Error ? err.message : "Failed to create category.",
+      );
     }
   }
 
@@ -49,17 +54,28 @@ export default function AdminCategoriesPage() {
       setEditingId(null);
       invalidate();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update category.");
+      setError(
+        err instanceof Error ? err.message : "Failed to update category.",
+      );
     }
   }
 
   async function handleDelete(category: CategoryDto) {
-    if (!confirm(`Delete "${category.name}"?`)) return;
+    const count = category._count?.products ?? 0;
+    if (
+      !confirm(
+        `Permanently delete "${category.name}"?\n\nThis cannot be undone. Categories containing Products cannot be deleted.\n\nCurrent Products: ${count}`,
+      )
+    )
+      return;
+    setError(null);
     try {
       await apiFetch(`/api/categories/${category.id}`, { method: "DELETE" });
       invalidate();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to delete category.");
+      setError(
+        err instanceof Error ? err.message : "Failed to delete category.",
+      );
     }
   }
 
@@ -67,7 +83,14 @@ export default function AdminCategoriesPage() {
     <div className="max-w-xl">
       <h1 className="mb-6 text-xl font-bold">Categories</h1>
 
-      {error && <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+      {error && (
+        <p
+          role="alert"
+          className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700"
+        >
+          {error}
+        </p>
+      )}
 
       {isLoading ? (
         <p>Loading…</p>
@@ -98,10 +121,16 @@ export default function AdminCategoriesPage() {
                 <td className="space-x-3 py-2 text-right">
                   {editingId === c.id ? (
                     <>
-                      <button onClick={() => handleUpdate(c.id)} className="underline">
+                      <button
+                        onClick={() => handleUpdate(c.id)}
+                        className="underline"
+                      >
                         Save
                       </button>
-                      <button onClick={() => setEditingId(null)} className="underline">
+                      <button
+                        onClick={() => setEditingId(null)}
+                        className="underline"
+                      >
                         Cancel
                       </button>
                     </>
@@ -116,7 +145,10 @@ export default function AdminCategoriesPage() {
                       >
                         Edit
                       </button>
-                      <button onClick={() => handleDelete(c)} className="text-red-600 underline">
+                      <button
+                        onClick={() => handleDelete(c)}
+                        className="text-red-600 underline"
+                      >
                         Delete
                       </button>
                     </>
@@ -130,8 +162,14 @@ export default function AdminCategoriesPage() {
 
       <form onSubmit={handleCreate} className="mt-6 flex items-end gap-2">
         <div>
-          <label className="mb-1 block text-xs font-medium">New category name</label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} className="w-48" />
+          <label className="mb-1 block text-xs font-medium">
+            New category name
+          </label>
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-48"
+          />
         </div>
         <Button type="submit">+ Create Category</Button>
       </form>

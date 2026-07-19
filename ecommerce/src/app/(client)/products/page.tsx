@@ -22,7 +22,9 @@ export default async function ProductsPage({ searchParams }: Props) {
     listCategories(),
   ]);
 
-  const activeCategory = categories.find((c) => c.slug === searchParams.category);
+  const activeCategory = categories.find(
+    (c) => c.slug === searchParams.category,
+  );
 
   function buildHref(p: number) {
     const params = new URLSearchParams();
@@ -43,11 +45,16 @@ export default async function ProductsPage({ searchParams }: Props) {
       </div>
 
       {searchParams.q && (
-        <p className="mb-4 text-sm text-gray-600">Results for: &quot;{searchParams.q}&quot;</p>
+        <p className="mb-4 text-sm text-gray-600">
+          Results for: &quot;{searchParams.q}&quot;
+        </p>
       )}
 
       <div className="grid grid-cols-1 gap-8 sm:grid-cols-[200px_1fr]">
-        <CategoryFilter categories={categories} activeSlug={searchParams.category} />
+        <CategoryFilter
+          categories={categories}
+          activeSlug={searchParams.category}
+        />
 
         <div>
           {products.length === 0 ? (
@@ -63,7 +70,11 @@ export default async function ProductsPage({ searchParams }: Props) {
                   <ProductCard key={product.id} product={product} />
                 ))}
               </div>
-              <Pagination page={page} totalPages={totalPages} buildHref={buildHref} />
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                buildHref={buildHref}
+              />
             </>
           )}
         </div>

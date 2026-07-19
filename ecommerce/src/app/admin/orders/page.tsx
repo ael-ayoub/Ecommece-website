@@ -24,7 +24,9 @@ export default function AdminOrdersPage() {
       if (search) params.set("search", search);
       params.set("sortBy", sortBy);
       params.set("sortDir", sortDir);
-      return apiFetch<{ orders: OrderDto[] }>(`/api/admin/orders?${params.toString()}`);
+      return apiFetch<{ orders: OrderDto[] }>(
+        `/api/admin/orders?${params.toString()}`,
+      );
     },
   });
 
@@ -58,7 +60,9 @@ export default function AdminOrdersPage() {
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium">Client search</label>
+          <label className="mb-1 block text-xs font-medium">
+            Client search
+          </label>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -71,7 +75,9 @@ export default function AdminOrdersPage() {
       {isLoading ? (
         <p>Loading…</p>
       ) : !data || data.orders.length === 0 ? (
-        <p className="text-gray-500">No orders found. Try adjusting your filters.</p>
+        <p className="text-gray-500">
+          No orders found. Try adjusting your filters.
+        </p>
       ) : (
         <table className="w-full text-sm">
           <thead>
@@ -79,12 +85,18 @@ export default function AdminOrdersPage() {
               <th className="py-2">Order</th>
               <th>Client / Contact</th>
               <th>
-                <button onClick={() => toggleSort("date")} className="hover:underline">
+                <button
+                  onClick={() => toggleSort("date")}
+                  className="hover:underline"
+                >
                   Date {sortBy === "date" && (sortDir === "asc" ? "▲" : "▼")}
                 </button>
               </th>
               <th>
-                <button onClick={() => toggleSort("price")} className="hover:underline">
+                <button
+                  onClick={() => toggleSort("price")}
+                  className="hover:underline"
+                >
                   Total {sortBy === "price" && (sortDir === "asc" ? "▲" : "▼")}
                 </button>
               </th>
@@ -102,7 +114,9 @@ export default function AdminOrdersPage() {
                 <td>
                   {order.contactName}
                   <div className="text-xs text-gray-500">
-                    {order.userId ? order.contactEmail : `Guest — ${order.contactEmail}`}
+                    {order.userId
+                      ? order.contactEmail
+                      : `Guest — ${order.contactEmail}`}
                   </div>
                 </td>
                 <td>{new Date(order.createdAt).toLocaleDateString()}</td>

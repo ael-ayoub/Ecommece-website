@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError } from "@/lib/errors";
-import { Prisma, ProductType } from "@prisma/client";
+import { OrderStatus, Prisma, ProductType } from "@prisma/client";
 import type {
   ProductCreateInput,
   ProductUpdateInput,
@@ -354,7 +354,7 @@ export async function updateProduct(id: number, input: ProductUpdateInput) {
   });
 }
 
-export async function archiveProduct(id: number) {
+export async function unpublishProduct(id: number) {
   return db.$transaction(async (tx) => {
     const rows = await tx.$queryRaw<Array<{ id: number }>>`
       SELECT id FROM "Product" WHERE id = ${id} FOR UPDATE
@@ -364,7 +364,7 @@ export async function archiveProduct(id: number) {
   });
 }
 
-export async function restoreProduct(id: number) {
+export async function publishProduct(id: number) {
   return db.$transaction(async (tx) => {
     const rows = await tx.$queryRaw<Array<{ id: number }>>`
       SELECT id FROM "Product" WHERE id = ${id} FOR UPDATE
@@ -375,9 +375,9 @@ export async function restoreProduct(id: number) {
 }
 
 /**
- * Permanently removes catalog rows only when no historical order references
- * the Product or any of its SKUs. Ordered Products remain archived so later
- * cancellation/return can still restore stock to the original SKU.
+ * Permanently removes catalog rows only when no non-terminal order can still
+ * require the Product's SKUs for cancellation/return inventory restoration.
+ * Historical order relations become null and immutable snapshots remain.
  */
 export async function permanentlyDeleteProduct(id: number) {
   return db.$transaction(async (tx) => {
@@ -393,15 +393,26 @@ export async function permanentlyDeleteProduct(id: number) {
       FOR UPDATE
     `;
 
-    const [productOrderCount, variantOrderCount] = await Promise.all([
-      tx.orderItem.count({ where: { productId: id } }),
-      tx.orderItemVariant.count({
-        where: { productVariant: { is: { productId: id } } },
-      }),
-    ]);
-    if (productOrderCount > 0 || variantOrderCount > 0) {
+    const activeStatuses = [
+      OrderStatus.PENDING,
+      OrderStatus.CONFIRMED,
+      OrderStatus.SHIPPED,
+    ];
+    const [productActiveOrderCount, variantActiveOrderCount] =
+      await Promise.all([
+        tx.orderItem.count({
+          where: { productId: id, order: { status: { in: activeStatuses } } },
+        }),
+        tx.orderItemVariant.count({
+          where: {
+            productVariant: { is: { productId: id } },
+            orderItem: { order: { status: { in: activeStatuses } } },
+          },
+        }),
+      ]);
+    if (productActiveOrderCount > 0 || variantActiveOrderCount > 0) {
       throw new ConflictError(
-        "This Product has order history and cannot be permanently deleted. Archive it instead.",
+        "This Product is referenced by an active order. Complete, cancel, or return those orders before deleting it.",
       );
     }
 

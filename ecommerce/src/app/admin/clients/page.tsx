@@ -9,7 +9,8 @@ export default function AdminClientsPage() {
   const router = useRouter();
   const { data, isLoading } = useQuery({
     queryKey: ["admin", "clients"],
-    queryFn: () => apiFetch<{ clients: ClientListItemDto[] }>("/api/admin/clients"),
+    queryFn: () =>
+      apiFetch<{ clients: ClientListItemDto[] }>("/api/admin/clients"),
   });
 
   return (
@@ -27,6 +28,7 @@ export default function AdminClientsPage() {
               <th className="py-2">Name</th>
               <th>Email</th>
               <th>Phone</th>
+              <th>Status</th>
               <th>Orders</th>
               <th>Last Order</th>
             </tr>
@@ -41,9 +43,22 @@ export default function AdminClientsPage() {
                 <td className="py-2">{client.name}</td>
                 <td>{client.email}</td>
                 <td>{client.phone}</td>
+                <td>
+                  <span
+                    className={`rounded px-2 py-0.5 text-xs ${
+                      client.isActive
+                        ? "bg-green-100 text-green-700"
+                        : "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    {client.isActive ? "Active" : "Disabled"}
+                  </span>
+                </td>
                 <td>{client.orderCount}</td>
                 <td>
-                  {client.lastOrderDate ? new Date(client.lastOrderDate).toLocaleDateString() : "—"}
+                  {client.lastOrderDate
+                    ? new Date(client.lastOrderDate).toLocaleDateString()
+                    : "—"}
                 </td>
               </tr>
             ))}

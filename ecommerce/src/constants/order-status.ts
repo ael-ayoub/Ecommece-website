@@ -37,10 +37,15 @@ export const ORDER_FORWARD_PATH: OrderStatusValue[] = [
 // do this (enforced by requireAdmin() on PUT /admin/orders/:id/status); the
 // service layer keeps stock consistent regardless of which direction the
 // status moves (see updateOrderStatusAsAdmin in order.service.ts).
-export function getAdminOrderTransitions(current: OrderStatusValue): OrderStatusValue[] {
+export function getAdminOrderTransitions(
+  current: OrderStatusValue,
+): OrderStatusValue[] {
   return [...allowedOrderTransitions(current)];
 }
 
 // Transitions that restore stock — shared by the UI (to decide whether to
 // show the "this will restore N units" confirmation) and the service layer.
-export const STOCK_RESTORING_STATUSES: OrderStatusValue[] = ["CANCELLED", "RETURNED"];
+export const STOCK_RESTORING_STATUSES: OrderStatusValue[] = [
+  "CANCELLED",
+  "RETURNED",
+];

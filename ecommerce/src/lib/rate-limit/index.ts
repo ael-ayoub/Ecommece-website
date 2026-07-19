@@ -16,7 +16,9 @@ export class RateLimitError extends ApiError {
 
 export function requestIp(req: NextRequest) {
   if (process.env.TRUST_PROXY === "true") {
-    return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    return (
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown"
+    );
   }
   return req.ip ?? "unknown";
 }
@@ -28,7 +30,8 @@ export function enforceRateLimit(key: string, limit: number, windowMs: number) {
     entries.set(key, { count: 1, resetAt: now + windowMs });
     return;
   }
-  if (entry.count >= limit) throw new RateLimitError(Math.ceil((entry.resetAt - now) / 1000));
+  if (entry.count >= limit)
+    throw new RateLimitError(Math.ceil((entry.resetAt - now) / 1000));
   entry.count += 1;
 }
 

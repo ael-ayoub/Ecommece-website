@@ -14,8 +14,15 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
   const user = await db.user.findUnique({
     where: { id: Number(payload.sub) },
-    select: { id: true, name: true, email: true, phone: true, role: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      role: true,
+      isActive: true,
+    },
   });
 
-  return user;
+  return user?.isActive ? user : null;
 }

@@ -35,10 +35,14 @@ export function CartItemRow({ item }: { item: CartItem }) {
             +
           </button>
         </div>
-        {atMax && <p className="mt-1 text-xs text-gray-500">Max stock reached</p>}
+        {atMax && (
+          <p className="mt-1 text-xs text-gray-500">Max stock reached</p>
+        )}
       </td>
       <td>{formatCurrency(item.unitPrice)}</td>
-      <td className="font-medium">{formatCurrency(item.unitPrice * item.quantity)}</td>
+      <td className="font-medium">
+        {formatCurrency(item.unitPrice * item.quantity)}
+      </td>
       <td>
         <button
           onClick={() => removeItem(item.id)}

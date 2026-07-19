@@ -15,8 +15,12 @@ export async function GET(req: NextRequest) {
     const user = wantsAll ? await getCurrentUser() : null;
 
     const result = await listProducts({
-      page: searchParams.get("page") ? Number(searchParams.get("page")) : undefined,
-      pageSize: searchParams.get("pageSize") ? Number(searchParams.get("pageSize")) : undefined,
+      page: searchParams.get("page")
+        ? Number(searchParams.get("page"))
+        : undefined,
+      pageSize: searchParams.get("pageSize")
+        ? Number(searchParams.get("pageSize"))
+        : undefined,
       categorySlug: searchParams.get("category") ?? undefined,
       search: searchParams.get("q") ?? undefined,
       includeInactive: wantsAll && user?.role === "ADMIN",

@@ -18,7 +18,9 @@ export function normalizeCheckoutItems(items: OrderCreateInput["items"]) {
     }
     const quantity = (quantities.get(item.variantId) ?? 0) + item.quantity;
     if (quantity > MAX_CHECKOUT_QUANTITY) {
-      throw new ConflictError("The requested quantity for an item is too large.");
+      throw new ConflictError(
+        "The requested quantity for an item is too large.",
+      );
     }
     quantities.set(item.variantId, quantity);
   }
@@ -28,7 +30,9 @@ export function normalizeCheckoutItems(items: OrderCreateInput["items"]) {
 }
 
 export function checkoutFingerprint(
-  input: Omit<OrderCreateInput, "items"> & { items: { variantId: number; quantity: number }[] },
+  input: Omit<OrderCreateInput, "items"> & {
+    items: { variantId: number; quantity: number }[];
+  },
   userId: number | null,
 ) {
   return createHash("sha256")

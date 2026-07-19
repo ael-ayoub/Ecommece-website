@@ -6,7 +6,10 @@ const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 export function assertSameOrigin(req: NextRequest) {
   if (!UNSAFE_METHODS.has(req.method) || !req.cookies.has("auth_token")) return;
   const allowed = new Set(
-    [process.env.APP_ORIGIN, ...(process.env.ADDITIONAL_ALLOWED_ORIGINS ?? "").split(",")]
+    [
+      process.env.APP_ORIGIN,
+      ...(process.env.ADDITIONAL_ALLOWED_ORIGINS ?? "").split(","),
+    ]
       .map((value) => value?.trim())
       .filter((value): value is string => Boolean(value)),
   );
@@ -21,5 +24,6 @@ export function assertSameOrigin(req: NextRequest) {
   } catch {
     throw new ForbiddenError("Invalid request origin.");
   }
-  if (!allowed.has(origin)) throw new ForbiddenError("Cross-origin mutation rejected.");
+  if (!allowed.has(origin))
+    throw new ForbiddenError("Cross-origin mutation rejected.");
 }

@@ -41,7 +41,11 @@ interface ExplicitVariantDraft {
   isActive: boolean;
 }
 
-function skuSuggestion(productName: string, selection: Record<string, string>, sequence: number) {
+function skuSuggestion(
+  productName: string,
+  selection: Record<string, string>,
+  sequence: number,
+) {
   const value = `${productName}-${Object.values(selection).join("-")}`
     .replace(/[^a-z0-9_-]+/gi, "-")
     .replace(/-+/g, "-")
@@ -55,18 +59,26 @@ export function ProductForm({ product }: Props) {
   const isEdit = Boolean(product);
   const [name, setName] = useState(product?.name ?? "");
   const [description, setDescription] = useState(product?.description ?? "");
-  const [basePrice, setBasePrice] = useState(product?.basePrice.toString() ?? "");
+  const [basePrice, setBasePrice] = useState(
+    product?.basePrice.toString() ?? "",
+  );
   const [categoryId, setCategoryId] = useState(
     product?.categoryId ? String(product.categoryId) : "",
   );
   const [isActive, setIsActive] = useState(product?.isActive ?? true);
-  const [showExactStock, setShowExactStock] = useState(product?.showExactStock ?? false);
+  const [showExactStock, setShowExactStock] = useState(
+    product?.showExactStock ?? false,
+  );
   const [productType, setProductType] = useState<"SIMPLE" | "CONFIGURABLE">(
     product?.productType ?? "SIMPLE",
   );
   const [simpleSku, setSimpleSku] = useState(product?.variants[0]?.sku ?? "");
-  const [simpleStock, setSimpleStock] = useState(String(product?.variants[0]?.stockQuantity ?? 0));
-  const [simpleEnabled, setSimpleEnabled] = useState(product?.variants[0]?.isActive ?? true);
+  const [simpleStock, setSimpleStock] = useState(
+    String(product?.variants[0]?.stockQuantity ?? 0),
+  );
+  const [simpleEnabled, setSimpleEnabled] = useState(
+    product?.variants[0]?.isActive ?? true,
+  );
   const [options, setOptions] = useState<DraftOption[]>([]);
   const [selection, setSelection] = useState<Record<string, string>>({});
   const [combinationLabel, setCombinationLabel] = useState("");
@@ -109,10 +121,13 @@ export function ProductForm({ product }: Props) {
     .reduce((sum, variant) => sum + variant.stockQuantity, 0);
   const prices = variants
     .filter((variant) => variant.isActive)
-    .map((variant) => effectivePrice(Number(basePrice) || 0, variant.priceOverride || null));
+    .map((variant) =>
+      effectivePrice(Number(basePrice) || 0, variant.priceOverride || null),
+    );
 
   function activateTemplate(template: TemplateDto) {
-    if (options.some((option) => option.sourceTemplateId === template.id)) return;
+    if (options.some((option) => option.sourceTemplateId === template.id))
+      return;
     setOptions((current) => [
       ...current,
       {
@@ -128,7 +143,9 @@ export function ProductForm({ product }: Props) {
   function removeOption(key: string) {
     if (
       variants.length > 0 &&
-      !window.confirm("Removing this option will discard every unsaved combination row. Continue?")
+      !window.confirm(
+        "Removing this option will discard every unsaved combination row. Continue?",
+      )
     ) {
       return;
     }
@@ -139,7 +156,9 @@ export function ProductForm({ product }: Props) {
 
   function toggleValue(key: string, value: string) {
     if (variants.length > 0) {
-      setFormError("Remove explicit combinations before changing selected option values.");
+      setFormError(
+        "Remove explicit combinations before changing selected option values.",
+      );
       return;
     }
     setOptions((current) =>
@@ -171,7 +190,9 @@ export function ProductForm({ product }: Props) {
   function addCombination() {
     setFormError(null);
     if (variants.length >= MAX_SKU_COMBINATIONS) {
-      setFormError(`A Product may have at most ${MAX_SKU_COMBINATIONS} explicit SKUs.`);
+      setFormError(
+        `A Product may have at most ${MAX_SKU_COMBINATIONS} explicit SKUs.`,
+      );
       return;
     }
     if (
@@ -187,7 +208,9 @@ export function ProductForm({ product }: Props) {
       setFormError("This option combination has already been added.");
       return;
     }
-    const sku = (combinationSku || skuSuggestion(name, selection, variants.length))
+    const sku = (
+      combinationSku || skuSuggestion(name, selection, variants.length)
+    )
       .trim()
       .toUpperCase();
     if (variants.some((variant) => variant.sku === sku)) {
@@ -233,19 +256,28 @@ export function ProductForm({ product }: Props) {
     const next: Record<string, string> = {};
     if (!name.trim()) next.name = "Name is required";
     if (!description.trim()) next.description = "Description is required";
-    if (!basePrice || Number(basePrice) <= 0) next.basePrice = "Price must be greater than 0";
+    if (!basePrice || Number(basePrice) <= 0)
+      next.basePrice = "Price must be greater than 0";
     if (!categoryId) next.categoryId = "Category is required";
-    if (!isEdit && productType === "SIMPLE" && !simpleSku.trim()) next.sku = "SKU is required";
+    if (!isEdit && productType === "SIMPLE" && !simpleSku.trim())
+      next.sku = "SKU is required";
     if (!isEdit && productType === "CONFIGURABLE") {
       if (options.length === 0) next.options = "Activate at least one option";
-      if (options.some((option) => !option.name.trim() || option.selectedValues.length === 0)) {
-        next.options = "Every option needs a name and at least one selected value";
+      if (
+        options.some(
+          (option) => !option.name.trim() || option.selectedValues.length === 0,
+        )
+      ) {
+        next.options =
+          "Every option needs a name and at least one selected value";
       }
       if (variants.length === 0 && isActive) {
-        next.variants = "An active configurable Product requires at least one explicit SKU";
+        next.variants =
+          "An active configurable Product requires at least one explicit SKU";
       }
       const skus = variants.map((variant) => variant.sku.trim().toUpperCase());
-      if (new Set(skus).size !== skus.length) next.sku = "Draft SKU codes must be unique";
+      if (new Set(skus).size !== skus.length)
+        next.sku = "Draft SKU codes must be unique";
       if (variants.some((variant) => !variant.label.trim())) {
         next.variants = "Every SKU requires a display label";
       }
@@ -301,7 +333,9 @@ export function ProductForm({ product }: Props) {
               label: variant.label,
               sku: variant.sku,
               stockQuantity: variant.stockQuantity,
-              priceOverride: variant.priceOverride ? Number(variant.priceOverride) : null,
+              priceOverride: variant.priceOverride
+                ? Number(variant.priceOverride)
+                : null,
               isActive: variant.isActive,
             })),
           }),
@@ -310,7 +344,9 @@ export function ProductForm({ product }: Props) {
       router.push("/admin/products");
       router.refresh();
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : "Failed to save Product.");
+      setFormError(
+        error instanceof Error ? error.message : "Failed to save Product.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -318,12 +354,20 @@ export function ProductForm({ product }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="flex max-w-5xl flex-col gap-5">
-      {formError && <p className="rounded bg-red-50 p-3 text-sm text-red-700">{formError}</p>}
+      {formError && (
+        <p className="rounded bg-red-50 p-3 text-sm text-red-700">
+          {formError}
+        </p>
+      )}
 
       <section className="grid gap-4 rounded border p-4 md:grid-cols-2">
         <h2 className="col-span-full font-semibold">1. Product information</h2>
         <label className="text-sm">
-          Name *<Input value={name} onChange={(event) => setName(event.target.value)} />
+          Name *
+          <Input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
           <FieldError message={errors.name} />
         </label>
         <label className="text-sm">
@@ -401,7 +445,9 @@ export function ProductForm({ product }: Props) {
             SKU code *
             <Input
               value={simpleSku}
-              onChange={(event) => setSimpleSku(event.target.value.toUpperCase())}
+              onChange={(event) =>
+                setSimpleSku(event.target.value.toUpperCase())
+              }
             />
             <FieldError message={errors.sku} />
           </label>
@@ -430,23 +476,29 @@ export function ProductForm({ product }: Props) {
           <section className="rounded border p-4">
             <h2 className="font-semibold">3. Define options and values</h2>
             <p className="mb-3 text-xs text-gray-500">
-              Add the options required to describe this Product. Only combinations added below will
-              become purchasable SKUs.
+              Add the options required to describe this Product. Only
+              combinations added below will become purchasable SKUs.
             </p>
             <div className="flex flex-wrap gap-2">
               {templateData?.templates.map((template) => {
-                const active = options.some((option) => option.sourceTemplateId === template.id);
+                const active = options.some(
+                  (option) => option.sourceTemplateId === template.id,
+                );
                 return (
                   <button
                     key={template.id}
                     type="button"
                     onClick={() =>
-                      active ? removeOption(`template-${template.id}`) : activateTemplate(template)
+                      active
+                        ? removeOption(`template-${template.id}`)
+                        : activateTemplate(template)
                     }
                     className={`rounded border px-3 py-2 text-sm ${active ? "bg-green-50" : ""}`}
                   >
                     {active ? "✓" : "+"} {template.name}
-                    {template.recommendedPriority !== null ? " · Recommended" : ""}
+                    {template.recommendedPriority !== null
+                      ? " · Recommended"
+                      : ""}
                     {template.isPinned ? " · Pinned" : ""}
                   </button>
                 );
@@ -513,8 +565,14 @@ export function ProductForm({ product }: Props) {
                             item.key === option.key
                               ? {
                                   ...item,
-                                  availableValues: [...item.availableValues, value],
-                                  selectedValues: [...item.selectedValues, value],
+                                  availableValues: [
+                                    ...item.availableValues,
+                                    value,
+                                  ],
+                                  selectedValues: [
+                                    ...item.selectedValues,
+                                    value,
+                                  ],
                                 }
                               : item,
                           ),
@@ -539,7 +597,10 @@ export function ProductForm({ product }: Props) {
                     <select
                       value={selection[option.name] ?? ""}
                       onChange={(event) => {
-                        const next = { ...selection, [option.name]: event.target.value };
+                        const next = {
+                          ...selection,
+                          [option.name]: event.target.value,
+                        };
                         setSelection(next);
                         setCombinationLabel(
                           options
@@ -547,7 +608,9 @@ export function ProductForm({ product }: Props) {
                             .filter(Boolean)
                             .join(" / "),
                         );
-                        setCombinationSku(skuSuggestion(name, next, variants.length));
+                        setCombinationSku(
+                          skuSuggestion(name, next, variants.length),
+                        );
                       }}
                       className="mt-1 block w-full rounded border px-2 py-2"
                     >
@@ -565,7 +628,9 @@ export function ProductForm({ product }: Props) {
                   <Input
                     value={combinationLabel}
                     placeholder={automaticLabel}
-                    onChange={(event) => setCombinationLabel(event.target.value)}
+                    onChange={(event) =>
+                      setCombinationLabel(event.target.value)
+                    }
                   />
                 </label>
                 <label className="text-sm">
@@ -574,7 +639,9 @@ export function ProductForm({ product }: Props) {
                     type="number"
                     min="0"
                     value={combinationStock}
-                    onChange={(event) => setCombinationStock(event.target.value)}
+                    onChange={(event) =>
+                      setCombinationStock(event.target.value)
+                    }
                   />
                 </label>
                 <label className="text-sm">
@@ -584,10 +651,13 @@ export function ProductForm({ product }: Props) {
                     min="0"
                     step="0.01"
                     value={combinationPrice || basePrice}
-                    onChange={(event) => setCombinationPrice(event.target.value)}
+                    onChange={(event) =>
+                      setCombinationPrice(event.target.value)
+                    }
                   />
                   <span className="text-xs text-gray-500">
-                    {!combinationPrice || Number(combinationPrice) === Number(basePrice)
+                    {!combinationPrice ||
+                    Number(combinationPrice) === Number(basePrice)
                       ? "Uses base price"
                       : "Custom price"}
                   </span>
@@ -605,7 +675,9 @@ export function ProductForm({ product }: Props) {
                   SKU suggestion
                   <Input
                     value={combinationSku}
-                    onChange={(event) => setCombinationSku(event.target.value.toUpperCase())}
+                    onChange={(event) =>
+                      setCombinationSku(event.target.value.toUpperCase())
+                    }
                   />
                 </label>
               )}
@@ -642,7 +714,9 @@ export function ProductForm({ product }: Props) {
                           <Input
                             value={variant.label}
                             onChange={(event) =>
-                              updateVariant(index, { label: event.target.value })
+                              updateVariant(index, {
+                                label: event.target.value,
+                              })
                             }
                           />
                         </td>
@@ -653,7 +727,10 @@ export function ProductForm({ product }: Props) {
                             value={variant.stockQuantity}
                             onChange={(event) =>
                               updateVariant(index, {
-                                stockQuantity: Math.max(0, Number(event.target.value)),
+                                stockQuantity: Math.max(
+                                  0,
+                                  Number(event.target.value),
+                                ),
                               })
                             }
                           />
@@ -666,13 +743,17 @@ export function ProductForm({ product }: Props) {
                             value={variant.priceOverride}
                             placeholder={`Base ${basePrice}`}
                             onChange={(event) =>
-                              updateVariant(index, { priceOverride: event.target.value })
+                              updateVariant(index, {
+                                priceOverride: event.target.value,
+                              })
                             }
                           />
                           <button
                             type="button"
                             className="text-xs underline"
-                            onClick={() => updateVariant(index, { priceOverride: "" })}
+                            onClick={() =>
+                              updateVariant(index, { priceOverride: "" })
+                            }
                           >
                             Reset to base
                           </button>
@@ -682,7 +763,9 @@ export function ProductForm({ product }: Props) {
                             type="checkbox"
                             checked={variant.isActive}
                             onChange={(event) =>
-                              updateVariant(index, { isActive: event.target.checked })
+                              updateVariant(index, {
+                                isActive: event.target.checked,
+                              })
                             }
                           />
                         </td>
@@ -691,7 +774,9 @@ export function ProductForm({ product }: Props) {
                             type="button"
                             className="text-red-600"
                             onClick={() =>
-                              setVariants((current) => current.filter((_, row) => row !== index))
+                              setVariants((current) =>
+                                current.filter((_, row) => row !== index),
+                              )
                             }
                           >
                             Remove
@@ -713,17 +798,21 @@ export function ProductForm({ product }: Props) {
                 Explicit SKUs: <strong>{variants.length}</strong>
               </span>
               <span>
-                Lowest price: <strong>{prices.length ? Math.min(...prices) : "—"}</strong>
+                Lowest price:{" "}
+                <strong>{prices.length ? Math.min(...prices) : "—"}</strong>
               </span>
               <span>
-                Highest price: <strong>{prices.length ? Math.max(...prices) : "—"}</strong>
+                Highest price:{" "}
+                <strong>{prices.length ? Math.max(...prices) : "—"}</strong>
               </span>
               <span>
                 Out of stock:{" "}
                 <strong>
                   {
-                    variants.filter((variant) => variant.isActive && variant.stockQuantity === 0)
-                      .length
+                    variants.filter(
+                      (variant) =>
+                        variant.isActive && variant.stockQuantity === 0,
+                    ).length
                   }
                 </strong>
               </span>
@@ -742,7 +831,8 @@ export function ProductForm({ product }: Props) {
       </label>
       {isEdit && (
         <p className="text-xs text-gray-500">
-          Product type and existing combinations are preserved. Use Manage Variants for SKU changes.
+          Product type and existing combinations are preserved. Use Manage
+          Variants for SKU changes.
         </p>
       )}
       <Button type="submit" disabled={submitting}>

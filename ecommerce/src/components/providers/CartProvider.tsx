@@ -1,6 +1,12 @@
 "use client";
 
-import { createContext, useContext, useEffect, useReducer, useRef } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useReducer,
+  useRef,
+} from "react";
 import type { CartItem } from "@/types/cart";
 
 const STORAGE_KEY = "cart";
@@ -29,13 +35,21 @@ function reducer(state: CartState, action: Action): CartState {
 
       const existing = state.items.find((i) => i.id === action.item.id);
       if (existing) {
-        const newQty = Math.min(existing.quantity + cappedQty, existing.stockQuantity);
+        const newQty = Math.min(
+          existing.quantity + cappedQty,
+          existing.stockQuantity,
+        );
         return {
           ...state,
-          items: state.items.map((i) => (i.id === existing.id ? { ...i, quantity: newQty } : i)),
+          items: state.items.map((i) =>
+            i.id === existing.id ? { ...i, quantity: newQty } : i,
+          ),
         };
       }
-      return { ...state, items: [...state.items, { ...action.item, quantity: cappedQty }] };
+      return {
+        ...state,
+        items: [...state.items, { ...action.item, quantity: cappedQty }],
+      };
     }
 
     case "UPDATE_QUANTITY": {
@@ -43,7 +57,13 @@ function reducer(state: CartState, action: Action): CartState {
         ...state,
         items: state.items.map((i) =>
           i.id === action.id
-            ? { ...i, quantity: Math.max(1, Math.min(action.quantity, i.stockQuantity)) }
+            ? {
+                ...i,
+                quantity: Math.max(
+                  1,
+                  Math.min(action.quantity, i.stockQuantity),
+                ),
+              }
             : i,
         ),
       };
@@ -82,7 +102,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
-      const parsed = raw ? (JSON.parse(raw) as (CartItem & { variantId?: number })[]) : [];
+      const parsed = raw
+        ? (JSON.parse(raw) as (CartItem & { variantId?: number })[])
+        : [];
       dispatch({
         type: "HYDRATE",
         items: parsed
@@ -107,7 +129,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [state.items, state.hydrated]);
 
   const itemCount = state.items.reduce((sum, i) => sum + i.quantity, 0);
-  const subtotal = state.items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
+  const subtotal = state.items.reduce(
+    (sum, i) => sum + i.unitPrice * i.quantity,
+    0,
+  );
 
   const value: CartContextValue = {
     items: state.items,
@@ -115,7 +140,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     itemCount,
     subtotal,
     addItem: (item, quantity = 1) => dispatch({ type: "ADD", item, quantity }),
-    updateQuantity: (id, quantity) => dispatch({ type: "UPDATE_QUANTITY", id, quantity }),
+    updateQuantity: (id, quantity) =>
+      dispatch({ type: "UPDATE_QUANTITY", id, quantity }),
     removeItem: (id) => dispatch({ type: "REMOVE", id }),
     clearCart: () => dispatch({ type: "CLEAR" }),
   };

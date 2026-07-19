@@ -9,12 +9,12 @@ interface Props {
 }
 
 export default async function EditProductPage({ params }: Props) {
-  const product = await getProductById(Number(params.id), { includeInactive: true }).catch(
-    (err) => {
-      if (err instanceof NotFoundError) return null;
-      throw err;
-    },
-  );
+  const product = await getProductById(Number(params.id), {
+    includeInactive: true,
+  }).catch((err) => {
+    if (err instanceof NotFoundError) return null;
+    throw err;
+  });
 
   if (!product) {
     notFound();
@@ -27,7 +27,10 @@ export default async function EditProductPage({ params }: Props) {
         product={{
           ...product,
           basePrice: product.basePrice.toString(),
-          variants: product.variants.map((v) => ({ ...v, price: v.price?.toString() ?? null })),
+          variants: product.variants.map((v) => ({
+            ...v,
+            price: v.price?.toString() ?? null,
+          })),
         }}
       />
       <Link

@@ -8,7 +8,11 @@ import { requireAdminPage } from "@/lib/guards/require-admin-page";
 // admin real-time connection — mounting it here, and only here, is what
 // scopes live updates to the admin section (architecture.md §11's "client
 // pages don't need live updates" rule) without touching (client)/* pages.
-export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   await requireAdminPage();
   return (
     <div className="flex min-h-screen">
@@ -18,19 +22,34 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <RealtimeStatusIndicator />
         </div>
         <nav className="flex flex-col gap-1 text-sm">
-          <Link href="/admin/dashboard" className="rounded px-2 py-1 hover:bg-gray-100">
+          <Link
+            href="/admin/dashboard"
+            className="rounded px-2 py-1 hover:bg-gray-100"
+          >
             Dashboard
           </Link>
-          <Link href="/admin/orders" className="rounded px-2 py-1 hover:bg-gray-100">
+          <Link
+            href="/admin/orders"
+            className="rounded px-2 py-1 hover:bg-gray-100"
+          >
             Orders
           </Link>
-          <Link href="/admin/products" className="rounded px-2 py-1 hover:bg-gray-100">
+          <Link
+            href="/admin/products"
+            className="rounded px-2 py-1 hover:bg-gray-100"
+          >
             Products
           </Link>
-          <Link href="/admin/categories" className="rounded px-2 py-1 hover:bg-gray-100">
+          <Link
+            href="/admin/categories"
+            className="rounded px-2 py-1 hover:bg-gray-100"
+          >
             Categories
           </Link>
-          <Link href="/admin/clients" className="rounded px-2 py-1 hover:bg-gray-100">
+          <Link
+            href="/admin/clients"
+            className="rounded px-2 py-1 hover:bg-gray-100"
+          >
             Clients
           </Link>
           <Link
@@ -40,7 +59,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             Option Presets
           </Link>
         </nav>
-        <Link href="/" className="mt-6 block text-xs text-gray-500 hover:underline">
+        <Link
+          href="/"
+          className="mt-6 block text-xs text-gray-500 hover:underline"
+        >
           ← Back to storefront
         </Link>
       </aside>

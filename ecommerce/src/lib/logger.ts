@@ -1,6 +1,7 @@
 type LogFields = Record<string, unknown>;
 
-const REDACTED_KEYS = /password|token|cookie|authorization|secret|database.?url|address/i;
+const REDACTED_KEYS =
+  /password|token|cookie|authorization|secret|database.?url|address/i;
 
 function sanitize(fields: LogFields): LogFields {
   return Object.fromEntries(
@@ -11,8 +12,17 @@ function sanitize(fields: LogFields): LogFields {
   );
 }
 
-function write(level: "info" | "warn" | "error", message: string, fields: LogFields = {}) {
-  const record = { timestamp: new Date().toISOString(), level, message, ...sanitize(fields) };
+function write(
+  level: "info" | "warn" | "error",
+  message: string,
+  fields: LogFields = {},
+) {
+  const record = {
+    timestamp: new Date().toISOString(),
+    level,
+    message,
+    ...sanitize(fields),
+  };
   if (process.env.NODE_ENV === "production") {
     console[level](JSON.stringify(record));
   } else {
@@ -23,5 +33,6 @@ function write(level: "info" | "warn" | "error", message: string, fields: LogFie
 export const logger = {
   info: (message: string, fields?: LogFields) => write("info", message, fields),
   warn: (message: string, fields?: LogFields) => write("warn", message, fields),
-  error: (message: string, fields?: LogFields) => write("error", message, fields),
+  error: (message: string, fields?: LogFields) =>
+    write("error", message, fields),
 };

@@ -3,6 +3,7 @@ import { updateCategory, deleteCategory } from "@/services/category.service";
 import { categorySchema } from "@/lib/validators";
 import { requireAdmin } from "@/lib/guards/require-admin";
 import { handleApiError } from "@/lib/errors";
+import { assertSameOrigin } from "@/lib/security/origin";
 
 interface Params {
   params: { id: string };
@@ -10,6 +11,7 @@ interface Params {
 
 export async function PUT(req: NextRequest, { params }: Params) {
   try {
+    assertSameOrigin(req);
     await requireAdmin();
     const body = await req.json();
     const input = categorySchema.parse(body);
@@ -20,8 +22,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: Params) {
+export async function DELETE(req: NextRequest, { params }: Params) {
   try {
+    assertSameOrigin(req);
     await requireAdmin();
     await deleteCategory(Number(params.id));
     return NextResponse.json({ success: true });

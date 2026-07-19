@@ -21,7 +21,8 @@ export default function ProductOptionSettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const { data } = useQuery({
     queryKey: ["admin", "option-templates", "settings"],
-    queryFn: () => apiFetch<{ templates: Template[] }>("/api/admin/option-templates"),
+    queryFn: () =>
+      apiFetch<{ templates: Template[] }>("/api/admin/option-templates"),
   });
 
   async function createTemplate(event: FormEvent) {
@@ -41,9 +42,13 @@ export default function ProductOptionSettingsPage() {
       });
       setName("");
       setValues("");
-      queryClient.invalidateQueries({ queryKey: ["admin", "option-templates"] });
+      queryClient.invalidateQueries({
+        queryKey: ["admin", "option-templates"],
+      });
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Failed to create preset.");
+      setError(
+        caught instanceof Error ? caught.message : "Failed to create preset.",
+      );
     }
   }
 
@@ -56,7 +61,9 @@ export default function ProductOptionSettingsPage() {
   }
 
   async function disable(template: Template) {
-    await apiFetch(`/api/admin/option-templates/${template.id}`, { method: "DELETE" });
+    await apiFetch(`/api/admin/option-templates/${template.id}`, {
+      method: "DELETE",
+    });
     queryClient.invalidateQueries({ queryKey: ["admin", "option-templates"] });
   }
 
@@ -64,10 +71,13 @@ export default function ProductOptionSettingsPage() {
     <div className="max-w-3xl">
       <h1 className="text-xl font-bold">Product option presets</h1>
       <p className="mb-5 text-sm text-gray-500">
-        Changes to a preset affect future Product creation only. Existing Products own independent
-        copies.
+        Changes to a preset affect future Product creation only. Existing
+        Products own independent copies.
       </p>
-      <form onSubmit={createTemplate} className="mb-6 grid gap-2 rounded border p-4 md:grid-cols-2">
+      <form
+        onSubmit={createTemplate}
+        className="mb-6 grid gap-2 rounded border p-4 md:grid-cols-2"
+      >
         <Input
           value={name}
           onChange={(event) => setName(event.target.value)}
@@ -83,12 +93,19 @@ export default function ProductOptionSettingsPage() {
       </form>
       <div className="space-y-2">
         {data?.templates.map((template) => (
-          <div key={template.id} className="flex items-center justify-between rounded border p-3">
+          <div
+            key={template.id}
+            className="flex items-center justify-between rounded border p-3"
+          >
             <div>
               <strong>{template.name}</strong>
               <p className="text-xs text-gray-500">
-                {template.ownerType === "SYSTEM" ? "Built-in, read-only" : "My saved option"} ·{" "}
-                {template.values.map((value) => value.value).join(", ") || "No preset values"}
+                {template.ownerType === "SYSTEM"
+                  ? "Built-in, read-only"
+                  : "My saved option"}{" "}
+                ·{" "}
+                {template.values.map((value) => value.value).join(", ") ||
+                  "No preset values"}
               </p>
             </div>
             <div className="flex gap-2">

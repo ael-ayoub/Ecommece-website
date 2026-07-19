@@ -18,7 +18,11 @@ export function RevenueChart({ points }: { points: RevenuePointDto[] }) {
   }));
 
   if (data.length === 0) {
-    return <p className="text-sm text-gray-500">No revenue yet — no Delivered orders.</p>;
+    return (
+      <p className="text-sm text-gray-500">
+        No revenue yet — no Delivered orders.
+      </p>
+    );
   }
 
   return (
@@ -28,7 +32,13 @@ export function RevenueChart({ points }: { points: RevenuePointDto[] }) {
         <XAxis dataKey="date" fontSize={12} />
         <YAxis fontSize={12} />
         <Tooltip formatter={(value) => `$${Number(value).toFixed(2)}`} />
-        <Line type="monotone" dataKey="revenue" stroke="#111827" strokeWidth={2} dot={false} />
+        <Line
+          type="monotone"
+          dataKey="revenue"
+          stroke="#111827"
+          strokeWidth={2}
+          dot={false}
+        />
       </LineChart>
     </ResponsiveContainer>
   );

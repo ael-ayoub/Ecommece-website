@@ -28,6 +28,8 @@ export interface OrderItemDto {
 export interface OrderDto {
   id: number;
   userId: number | null;
+  customerAccountIdSnapshot: number | null;
+  user: { id: number } | null;
   contactName: string;
   contactEmail: string;
   contactPhone: string;
