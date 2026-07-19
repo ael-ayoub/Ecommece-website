@@ -23,31 +23,44 @@
 ## 1. Project Structure Overview
 
 ```
-ecommerce-v1/
-├── src/
-│   ├── app/
-│   ├── components/
-│   ├── lib/
-│   ├── hooks/
-│   ├── types/
-│   ├── services/
-│   ├── middleware/
-│   ├── constants/
-│   └── styles/
-├── prisma/
-├── public/
-├── tests/
-├── docs/
+Ecommece-website/
+├── docker-compose.yml
+├── Makefile
 ├── .env.example
-├── .gitignore
-├── tsconfig.json
-├── next.config.js
-├── tailwind.config.ts
-├── package.json
-└── README.md
+├── README.md
+├── docs/
+└── ecommerce/
+    ├── Dockerfile
+    ├── package.json
+    ├── prisma/
+    ├── public/
+    ├── tests/
+    ├── src/
+    │   ├── app/
+    │   ├── components/
+    │   ├── domain/
+    │   ├── hooks/
+    │   ├── lib/
+    │   ├── services/
+    │   ├── types/
+    │   └── middleware.ts
+    ├── next.config.mjs
+    ├── tailwind.config.ts
+    └── tsconfig.json
 ```
 
-**One deliberate deviation from a typical starter template worth naming up front:** there is no top-level `src/utils/` folder separate from `src/lib/`. Many Next.js templates have both, and in practice teams can never consistently answer "does this helper go in `lib` or `utils`?" — the distinction rots within weeks. This project merges them: `src/lib/` holds _all_ shared, non-component logic — from a formatting helper to the Prisma client singleton — organized into subfolders by what it does, not by which folder it happened to land in. One less ambiguous boundary to maintain is worth more than the theoretical purity of separating "app logic" from "generic helpers."
+The root is the operational boundary: it owns Compose, environment
+configuration, persistent volumes, and lifecycle commands. `ecommerce/` is the
+single application package and Docker build context. It owns all Node,
+Next.js, Prisma, test, and application configuration.
+
+Run `docker compose` and `make` from the repository root. Run direct npm
+commands from `ecommerce/`, or execute them inside the `app` container.
+
+The current tree contains placeholder `.gitkeep` directories under
+`src/utils/`, `src/styles/`, and a few feature folders. They do not define
+separate architectural layers; active shared logic belongs in `src/lib/` or
+`src/domain/` according to responsibility.
 
 Similarly, hooks live in exactly one place — `src/hooks/` — not duplicated between there and a nested `components/hooks/`. A hook is either broadly reusable (belongs at `src/hooks/`) or so specific to one component that it doesn't need to be a named, exported hook at all (it can just be inline logic in that component). Having two candidate homes for the same kind of file is a recurring source of "wait, which one did we use last time?" — so this document collapses it to one.
 
@@ -142,7 +155,7 @@ src/components/
 │   ├── products/  # AdminProductList.tsx, AdminProductForm.tsx, VariantManager.tsx
 │   ├── categories/# AdminCategoryList.tsx, AdminCategoryForm.tsx
 │   ├── clients/   # AdminClientList.tsx, AdminClientDetail.tsx
-│   └── RealtimeOrderWatcher.tsx   # owns the Supabase Realtime subscription for admin pages
+│   └── RealtimeStatusIndicator.tsx # reports authenticated SSE connection state
 └── common/        # Loading.tsx, ErrorBoundary.tsx, Pagination.tsx, StatusBadge.tsx, ConfirmModal.tsx, Toast.tsx
 ```
 
@@ -167,7 +180,7 @@ src/lib/
 ├── validators.ts        # Zod schemas for request bodies (register, login, place-order, product form...)
 ├── errors.ts             # Custom error classes (NotFoundError, ValidationError, ForbiddenError...)
 ├── api-client.ts          # Client-side fetch wrapper — attaches auth header, parses JSON, normalizes errors
-├── realtime.ts             # Supabase Realtime client setup + subscribe/unsubscribe helpers
+├── realtime/               # PostgreSQL listener, outbox dispatcher, and notification helpers
 ├── cloudinary.ts            # Cloudinary SDK init + upload/delete wrappers
 ├── format.ts                 # Currency, date formatting shared by admin and client UI
 └── calculations.ts             # Cart/order total math (shared so client-side preview and server-side total never drift)
@@ -175,7 +188,10 @@ src/lib/
 
 **Why this structure:** everything here is a _utility a service or a component reaches for_, never a thing that owns business rules on its own. `db.ts` is the one and only place `new PrismaClient()` is called — every other file imports the singleton from here, which is what prevents the classic Next.js dev-mode "too many database connections" bug. `calculations.ts` deserves particular emphasis: order total math is computed in exactly one function, imported both by the cart-preview UI and by the order-placement service, so the number the client sees before checkout and the number the server actually charges can never silently diverge.
 
-**Dependencies:** `lib/` may import from `types/` and `constants/`, and from third-party packages (Prisma, jsonwebtoken, bcrypt, Cloudinary SDK, Supabase client). It must never import from `components/` or `app/` — logic flows one direction, down from routes/components into lib, never back up.
+**Dependencies:** `lib/` may import from `types/` and `constants/`, and from
+third-party packages such as Prisma, `pg`, jsonwebtoken, and bcrypt. It must
+never import from `components/` or `app/` — logic flows one direction, down
+from routes/components into lib, never back up.
 
 ### 2.4 `src/types/`
 
@@ -316,15 +332,24 @@ docs/
 
 ### 2.13 Root configuration files
 
-| File                 | Purpose                                                                                                                                                                                                                                                                         |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `package.json`       | Dependencies (`next`, `react`, `typescript`, `prisma`, `@tanstack/react-query`, `recharts`, `zod`, `jsonwebtoken`, `bcrypt`, `@supabase/supabase-js`, `cloudinary`, `tailwindcss`) and scripts (`dev`, `build`, `start`, `prisma migrate`, `prisma generate`, `prisma db seed`) |
-| `tsconfig.json`      | Strict mode enabled; path aliases (`@/components`, `@/lib`, `@/services`, `@/types`, etc.) so imports never need long relative `../../../` chains                                                                                                                               |
-| `next.config.js`     | Cloudinary listed as an allowed remote image domain (for `next/image`); no other special build config expected for v1                                                                                                                                                           |
-| `tailwind.config.ts` | Theme tokens (colors, spacing) and shadcn/ui's required configuration                                                                                                                                                                                                           |
-| `.env.example`       | Every environment variable name the app needs, with placeholder/blank values — `DATABASE_URL`, `JWT_SECRET`, `CLOUDINARY_*`, `SUPABASE_*` — committed to the repo so no one has to guess what to set                                                                            |
-| `.gitignore`         | Must exclude `.env`, `.env.local`, `node_modules`, `.next`, and any Prisma-generated client output                                                                                                                                                                              |
-| `README.md`          | Quick-start (clone → install → set env → migrate → dev), a one-paragraph tech stack summary, and links into `docs/` for anything deeper                                                                                                                                         |
+| File | Purpose |
+| --- | --- |
+| `docker-compose.yml` | Defines the local PostgreSQL and bind-mounted Next.js development containers, health checks, ports, dependencies, and named volumes |
+| `Makefile` | Root shortcuts for starting, seeding, stopping, and destructively resetting the Compose stack |
+| `.env.example` | Root environment contract copied to `.env` for Compose |
+| `README.md` | Current setup and daily operation |
+| `docs/docker-architecture.md` | Detailed container, volume, port, health, Prisma, and production-boundary documentation |
+
+### 2.14 Application package configuration
+
+| File | Purpose |
+| --- | --- |
+| `ecommerce/package.json` | Application dependencies and Next.js, test, formatting, and Prisma scripts |
+| `ecommerce/tsconfig.json` | TypeScript configuration and `@/*` imports rooted at `ecommerce/src` |
+| `ecommerce/next.config.mjs` | Next.js configuration |
+| `ecommerce/tailwind.config.ts` | Tailwind content paths and theme configuration |
+| `ecommerce/Dockerfile` | Development image used by the root Compose app service |
+| `ecommerce/prisma/schema.prisma` | Database schema and generated-client source of truth |
 
 ---
 
@@ -362,7 +387,10 @@ Everything in `services/` is written so it _could_ be called from something othe
 
 - No `redux/` or global state library folder — React Query (already in the stack per architecture.md) plus a handful of hooks (`useAuth`, `useCart`) is sufficient for v1's actual state needs; adding a heavier state management layer would be solving a problem this app doesn't have.
 - No `graphql/` — the API is REST, matching the endpoint list already locked in architecture.md; introducing a second query paradigm here would contradict a decision already made.
-- No separate `microservices` or multi-package monorepo structure — v1 is one Next.js app, one deployable, per the "single Vercel project" deployment decision; a monorepo's benefits (independent deploys, shared internal packages) don't apply to a single-app v1 and would only add tooling overhead.
+- No separate microservices or multi-package monorepo structure — v1 is one
+  Next.js modular monolith and one PostgreSQL database. The root/application
+  directory split is an operational boundary, not a second deployable service
+  or package workspace.
 
 ---
 

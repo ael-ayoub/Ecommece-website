@@ -1,71 +1,132 @@
 # E-Commerce Platform v1
 
-Cash-on-Delivery marketplace — Next.js 14 (App Router, TypeScript), PostgreSQL + Prisma, JWT auth.
+Cash-on-delivery marketplace built as a Next.js 14 modular monolith with
+PostgreSQL, Prisma, JWT authentication, explicit Product/SKU combinations, and
+SKU-owned inventory.
 
-Inventory is SKU-first: Products contain descriptive data, every purchasable
-unit is a ProductVariant with a unique SKU, and stock exists only on that SKU.
-Simple Products have one hidden default SKU; configurable Products use
-structured options and exact SKU combinations.
+The repository is split into two operational layers:
 
-Admins can start configurable Products from read-only built-in option templates
-or personal presets. Templates are copied into Product-owned options and never
-remain a live dependency of an existing Product.
+- The repository root owns Docker Compose, environment configuration,
+  persistent volumes, and lifecycle commands.
+- [`ecommerce/`](ecommerce/) is the complete Next.js application package,
+  including its Dockerfile, source, Prisma schema/migrations/seed, tests, and
+  npm scripts.
 
-Selecting option values does not generate SKUs. Sellers add only combinations
-they actually offer; each explicit row becomes one ProductVariant with its own
-label, stock, SKU code, and optional price override.
+See [Docker architecture](docs/docker-architecture.md),
+[system architecture](docs/architecture.md), and
+[project structure](docs/project-structure.md) for the detailed design.
 
-See [docs/architecture.md](docs/architecture.md), [docs/admin-dashboard-spec.md](docs/admin-dashboard-spec.md), [docs/client-interface-spec.md](docs/client-interface-spec.md), and [docs/project-structure.md](docs/project-structure.md) for the full design. This README only covers running the project locally.
+## Current local architecture
 
-**Status:** v1 hardening in progress — critical checkout, inventory, lifecycle,
-and realtime reliability controls are implemented; see the latest report in
-`docs/` for remaining verification gaps.
+Docker Compose runs two long-lived containers:
 
-The realtime path uses PostgreSQL `LISTEN/NOTIFY`, an in-process outbox
-dispatcher, and authenticated SSE. Production therefore requires a long-running
-Next.js Node container behind TLS; ordinary serverless deployment is not
-supported by this realtime design.
+| Service | Container | Runtime | Host access |
+| --- | --- | --- | --- |
+| `db` | `database` | PostgreSQL 15 Alpine | `127.0.0.1:${POSTGRES_PORT:-5432}` |
+| `app` | `ecommerce` | Next.js development server on container port `8080` | `http://localhost:3000` |
 
-## Tech stack (v1)
+The app source is bind-mounted from `./ecommerce` to `/app`. Separate named
+volumes retain container-managed `node_modules` and `.next` data. PostgreSQL
+data is retained in the `db_data` named volume.
 
-Next.js 14+ (App Router, TS) · Tailwind CSS + shadcn/ui · React Query · Recharts · PostgreSQL 15+ · Prisma · JWT + bcrypt · Supabase Realtime · Cloudinary · Vercel
+At app startup, the container runs:
 
-## Local development
+```text
+prisma generate → prisma migrate deploy → next dev
+```
 
-The whole stack — Postgres **and** the app — runs in containers, driven by a `Makefile`:
+The app starts only after PostgreSQL is healthy. Docker checks application
+readiness through `http://127.0.0.1:8080/api/health` inside the app container.
 
-1. Copy the env template and fill in real values:
+## Setup
+
+1. Create the root environment file:
+
+   ```bash
+   cp .env.example .env
    ```
-   cp .env.example .env.local
-   ```
-   Set `JWT_SECRET` (generate one with `openssl rand -hex 32`) and `ADMIN_EMAIL`/`ADMIN_PASSWORD` (the login the seed script creates — change these and re-seed any time to change the admin account, no code edit needed). Leave `DATABASE_URL`/`POSTGRES_*` as-is unless you need to change the local Postgres credentials.
-2. Build and start everything:
-   ```
+
+2. Fill in the required values. In particular:
+
+   - `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD`
+   - `DATABASE_URL`, using `db:5432` as the hostname from inside Compose
+   - `JWT_SECRET`
+   - `ADMIN_EMAIL` and `ADMIN_PASSWORD`
+   - `APP_ORIGIN=http://localhost:3000`
+
+   Keep the PostgreSQL values and `DATABASE_URL` credentials synchronized.
+   Never commit `.env`.
+
+3. Build and start the stack:
+
+   ```bash
    make
    ```
-   This builds the app image, starts Postgres and the app, and applies any pending migrations automatically on container startup. The app is served at http://localhost:3000; Postgres is reachable at `localhost:5432` for a GUI client.
-3. Populate the database with sample data:
-   ```
+
+4. Seed the development database:
+
+   ```bash
    make seed
    ```
 
-That's the whole loop. Four targets, nothing else:
+   The repeatable seed creates or updates the environment-configured admin and
+   the development catalog. It does not clear orders, historical snapshots, or
+   unrelated data.
 
-| Command       | Does                                                                                                               |
-| ------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `make`        | Build and start the full containerized stack (Postgres + app)                                                      |
-| `make seed`   | Run the seed script inside the app container                                                                       |
-| `make clean`  | Stop and remove the containers — keeps your database volume (your data)                                            |
-| `make fclean` | Full reset: also removes the database volume, built images, `node_modules`, and `.next` — back to a fresh checkout |
+5. Open:
 
-Running `npm install` locally afterward is optional — it's only needed for your editor's TypeScript/ESLint tooling, not to run the app, since the container builds its own dependencies independently.
+   - Storefront: <http://localhost:3000>
+   - Health/readiness: <http://localhost:3000/api/health>
 
-## How production deployment differs
+## Daily commands
 
-- **Hosting:** the Next.js app (frontend + API routes) deploys to **Vercel**, built directly from the git repository — no container image is built or shipped there. The `Dockerfile`/`docker-compose.yml` here are for local development and for a container-based deployment target, if you use one instead of Vercel.
-- **Database:** a managed PostgreSQL 15+ instance in production (not the `postgres:15-alpine` container). `DATABASE_URL` points at that managed instance instead of `db`.
-- **Migrations:** applied with `prisma migrate deploy` — the same command the app container already runs on every startup here, just against the production database.
-- **Environment variables:** set directly in Vercel's project settings (or your container platform's secrets) — not read from `.env.local`, which never leaves your machine.
-- **Real-time / images:** Supabase Realtime and Cloudinary are external managed services in both environments — locally and in production, the app connects to the same hosted services, just with different project credentials.
+| Command | Purpose |
+| --- | --- |
+| `make` | Build and start PostgreSQL and the bind-mounted Next.js app |
+| `make seed` | Apply the idempotent development seed inside the app container |
+| `docker compose ps` | Show container and health status |
+| `docker compose logs -f app` | Follow application logs |
+| `docker compose exec app npm test` | Run tests inside the application container |
+| `make clean` | Stop/remove containers and the Compose network; preserve named volumes |
+| `make fclean` | Destructive reset, including the PostgreSQL volume and local images |
 
-Full deployment checklist: [docs/architecture.md](docs/architecture.md), Section 18.
+Source changes under `ecommerce/` are visible to `next dev` through the bind
+mount. Dependency changes require rebuilding the app image/volume:
+
+```bash
+docker compose up -d --build --force-recreate app
+```
+
+## Prisma commands
+
+Run Prisma inside the app container so it uses the same package, generated
+client, schema, Compose network, and `DATABASE_URL` as the application:
+
+```bash
+docker compose exec app npm run prisma:generate
+docker compose exec app npm run prisma:deploy
+docker compose exec app npm run prisma:seed
+```
+
+To open Prisma Studio as a temporary development process:
+
+```bash
+docker compose run --rm -p 5555:5555 app \
+  npm run prisma:studio -- --hostname 0.0.0.0 --port 5555 --browser none
+```
+
+Then open <http://localhost:5555>. Stop the foreground command with `Ctrl+C`.
+Studio is intentionally not part of the normal Compose stack.
+
+## Deployment boundary
+
+The checked-in Compose/Dockerfile setup is optimized for local development:
+it bind-mounts source and runs `next dev`. It is not a production image.
+
+The application’s PostgreSQL `LISTEN/NOTIFY`, transactional outbox dispatcher,
+and authenticated SSE path require a long-running Node process. A production
+deployment therefore needs a production-built Next.js Node container (or
+equivalent persistent Node runtime), managed PostgreSQL, external TLS
+termination, secret management, and `prisma migrate deploy` as a release step.
+Ordinary short-lived serverless functions are not compatible with that
+realtime runtime model.

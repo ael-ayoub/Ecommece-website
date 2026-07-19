@@ -1,8 +1,10 @@
-// Development catalog seed. This script only upserts rows owned by the seed;
-// it never clears customer, order, inventory-history, or unrelated catalog data.
+// Development seed. This script only upserts the configured admin and catalog
+// rows owned by the seed; it never clears customer, order, inventory-history,
+// or unrelated catalog data.
 // Run with: npm run prisma:seed
 
-import { Prisma, PrismaClient, ProductType } from "@prisma/client";
+import { Prisma, PrismaClient, ProductType, Role } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const db = new PrismaClient();
 
@@ -181,6 +183,31 @@ async function upsertSeedProduct(seed: SeedProduct) {
 }
 
 async function main() {
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminEmail || !adminPassword) {
+    throw new Error("ADMIN_EMAIL and ADMIN_PASSWORD must be set before running the seed.");
+  }
+  if (adminPassword.length < 8) {
+    throw new Error("ADMIN_PASSWORD must contain at least 8 characters.");
+  }
+
+  const adminPasswordHash = await bcrypt.hash(adminPassword, 10);
+  await db.user.upsert({
+    where: { email: adminEmail },
+    create: {
+      name: "Marketplace Admin",
+      email: adminEmail,
+      passwordHash: adminPasswordHash,
+      phone: "000000",
+      role: Role.ADMIN,
+    },
+    update: {
+      passwordHash: adminPasswordHash,
+      role: Role.ADMIN,
+    },
+  });
+
   const [apparel, electronics, homeKitchen] = await Promise.all([
     db.category.upsert({
       where: { slug: "apparel" },
@@ -391,7 +418,8 @@ async function main() {
   const seeded = [];
   for (const product of products) seeded.push(await upsertSeedProduct(product));
 
-  console.log("Development catalog seed complete (orders and users unchanged):");
+  console.log("Development seed complete (orders and historical data unchanged):");
+  console.log("  Admin account: created or updated from environment");
   for (const product of seeded) {
     const totalStock = product.variants.reduce((sum, variant) => sum + variant.stockQuantity, 0);
     console.log(`  ${product.name}: ${product.variants.length} SKU(s), ${totalStock} total stock`);

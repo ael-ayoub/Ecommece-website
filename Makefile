@@ -2,10 +2,9 @@
 
 .PHONY: all seed clean fclean start dev dev-down
 
-# Build and start the full containerized stack (Postgres + the app). The
-# app image runs `prisma migrate deploy` on startup before serving, so a
-# fresh checkout is fully self-contained — this is the only thing plain
-# `make` does.
+# Build and start the local containerized stack. The app uses the bind-mounted
+# ./ecommerce package, generates Prisma Client, applies committed migrations,
+# and starts Next.js in development mode on internal port 8080.
 all:
 	docker compose up -d --build
 
@@ -22,9 +21,8 @@ dev:
 dev-down:
 	docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 
-# Populate the database with sample data, run inside the running app
-# container (admin login comes from ADMIN_EMAIL/ADMIN_PASSWORD in
-# .env.local — see .env.example).
+# Populate the development database inside the running app container. The
+# admin login comes from ADMIN_EMAIL/ADMIN_PASSWORD in root .env.
 seed:
 	docker compose exec app npm run prisma:seed
 

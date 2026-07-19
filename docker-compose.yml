@@ -1,55 +1,83 @@
-# Fully containerized local stack — both the database and the app run in
-# containers, orchestrated by `make` (see Makefile). This is a
-# container-based deployment path in addition to the Vercel path described
-# in docs/architecture.md §18.
-
 services:
   db:
-    build:
-      context: .
-      dockerfile: Dockerfile.database
-    image: database
+    image: postgres:15-alpine
     container_name: database
     restart: unless-stopped
+
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-ecommerce}
       POSTGRES_USER: ${POSTGRES_USER:-ecommerce}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+
     volumes:
       - db_data:/var/lib/postgresql/data
+
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ecommerce}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}",
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 10s
 
   app:
     build:
-      context: .
+      context: ./ecommerce
       dockerfile: Dockerfile
-    image: ecommerce
+
+    image: ecommerce:dev
+    pull_policy: build
     container_name: ecommerce
     restart: unless-stopped
+    init: true
+    working_dir: /app
+
+    command:
+      ["sh", "-c", "npx prisma generate && npx prisma migrate deploy && npm run dev"]
+
     env_file:
-      - .env.local
+      - .env
+
+    environment:
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
+
     ports:
-      - "3000:3000"
+      - "3000:8080"
+
     depends_on:
       db:
         condition: service_healthy
+
+    volumes:
+      - ./ecommerce:/app
+      - ecommerce_node_modules:/app/node_modules
+      - ecommerce_next:/app/.next
+
     healthcheck:
       test:
         [
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+          "fetch('http://127.0.0.1:8080/api/health').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))",
         ]
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 30s
 
 volumes:
   db_data:
+    name: db_data
+
+  ecommerce_node_modules:
+    name: ecommerce_node_modules
+
+  ecommerce_next:
+    name: ecommerce_next

@@ -445,7 +445,9 @@ PUT    /users/me                      (update own profile)
 
 1. **Stock reservation duration for unconfirmed Pending orders:** since stock decrements immediately at placement and there's no auto-expiry in v1, a guest or client order that never gets confirmed/cancelled ties up stock indefinitely. Is this acceptable for v1, or should there eventually be a manual "release stock" admin action for stale Pending orders? (Not required to build now — flagging as a known v1 limitation.)
 2. **Guest checkout duplicate-order prevention:** since guests aren't identified, is any lightweight duplicate-submission protection needed (e.g., idempotency on rapid double-clicks), or is that out of scope for v1?
-3. **Admin account creation:** is there a seed/bootstrap admin account, or does `/auth/register` support creating an admin (with some gate), or are admins provisioned directly in the database only?
+3. **Admin account creation:** resolved — the development seed upserts one
+   administrator from `ADMIN_EMAIL` and `ADMIN_PASSWORD`; public registration
+   creates client accounts only.
 4. **Product deletion when active orders reference it:** confirmed soft-delete approach — did you also want products with zero remaining variants (all deactivated) to auto-deactivate the parent product, or is that a manual admin action?
 
 ---
@@ -460,16 +462,17 @@ Final v1 stack decisions. Everything below is chosen specifically to keep v1 sim
 | Styling               | **Tailwind CSS**                         | Utility-first CSS                                                                 | Fast to build consistent UI without a separate design system; pairs directly with shadcn/ui                                                                                                                                                                    | Used across all pages and admin components                                                                                                                                      |
 | UI components         | **shadcn/ui**                            | Pre-built accessible React components (tables, dialogs, dropdowns, forms)         | Avoids hand-building common admin patterns (data tables, status dropdowns, modals) from scratch                                                                                                                                                                | Powers the admin Orders table, status change dropdown, product/category forms                                                                                                   |
 | Client-side data sync | **React Query (TanStack Query)**         | Caches server data in the browser, handles refetching, loading/error states       | Needed regardless of real-time layer — gives a single place to invalidate/refresh order and product data after any mutation or real-time event                                                                                                                 | Wraps every data-fetching hook (`useOrders`, `useProducts`, etc.); is the layer that real-time events ultimately feed into (Section 11)                                         |
-| Backend               | **Next.js API Routes (TypeScript)**      | Implements all endpoints in Section 5                                             | No separate backend service to deploy/host — API routes ship with the same Next.js app and the same Vercel deployment                                                                                                                                          | Implements `/api/auth/*`, `/api/admin/*`, `/api/products`, `/api/orders`, etc.                                                                                                  |
+| Backend               | **Next.js API Routes (TypeScript)**      | Implements all endpoints in Section 5                                             | No separate backend service to deploy/host — API routes ship with the same long-running Next.js Node application                                                                                                                                                | Implements `/api/auth/*`, `/api/admin/*`, `/api/products`, `/api/orders`, etc.                                                                                                  |
 | Database              | **PostgreSQL 15+**                       | Relational storage for all entities in Section 2                                  | Strong relational integrity (FKs, unique constraints) fits this domain well — orders/variants/stock require transactional correctness, not a document store                                                                                                    | Single source of truth; every entity in Section 2 is a Postgres table                                                                                                           |
 | ORM                   | **Prisma**                               | Type-safe DB access, migrations, query builder                                    | Generates TypeScript types from the schema so API routes get compile-time safety; `prisma migrate` gives a clean, reviewable migration history                                                                                                                 | Used by every API route to read/write; also provides the transaction API used for stock-locking (Section 14)                                                                    |
 | Authentication        | **JWT + bcrypt (custom, in API routes)** | Issues signed session tokens on login; hashes/verifies passwords                  | Avoids pulling in a full third-party auth provider for a two-role (admin/client) system — a custom implementation is small enough to own directly and keeps auth logic co-located with the rest of the API                                                     | `bcrypt` hashes `User.password_hash`; JWT is issued at `/auth/login`, verified on every authenticated request, and its payload carries `user_id` + `role` for permission checks |
-| Real-time updates     | **Supabase Realtime**                    | Broadcasts database row changes to subscribed clients over WebSockets             | Chosen over standing up a separate Socket.io server: Supabase Realtime listens to Postgres changes directly (via logical replication) with no extra server process to deploy/scale on Vercel's serverless model, which does not hold long-lived processes well | Admin dashboard subscribes to the `Order` table's change stream (see Section 11)                                                                                                |
-| Image handling        | **Cloudinary**                           | Hosts and serves product images (upload, storage, CDN delivery)                   | Offloads image storage/optimization so the app database and Vercel deployment never handle binary files directly                                                                                                                                               | `Product.images` store Cloudinary URLs; admin product form uploads directly to Cloudinary                                                                                       |
+| Real-time updates     | **PostgreSQL LISTEN/NOTIFY + transactional outbox + authenticated SSE** | Publishes committed order events to connected admin browsers | Keeps event creation transactional with order writes and avoids a second realtime vendor; requires a persistent Node process | The outbox dispatcher publishes notifications and `/api/admin/realtime` streams invalidation events (Section 11) |
+| Image handling        | **Cloudinary**                           | Hosts and serves product images (upload, storage, CDN delivery)                   | Offloads image storage/optimization so the app database and application container never handle persistent binary files                                                                                                                                          | `Product.images` store Cloudinary URLs; admin product form uploads directly to Cloudinary                                                                                       |
 | Admin charts          | **Recharts**                             | React charting library (bar/line/pie charts)                                      | Lightweight, composable, and sufficient for the fixed set of v1 analytics charts (Section 12) — no need for a heavier BI tool                                                                                                                                  | Renders the charts on the Analytics/Dashboard admin page                                                                                                                        |
-| Deployment            | **Vercel**                               | Hosting for the Next.js app (frontend + API routes)                               | Native fit for Next.js (same vendor), zero-config CI/CD from git push, serverless scaling appropriate for v1's traffic level                                                                                                                                   | Hosts the entire app; Postgres and Supabase Realtime are external managed services it connects to                                                                               |
+| Deployment            | **Long-running Node container/runtime**  | Hosts the Next.js frontend, API routes, outbox dispatcher, PostgreSQL listener, and SSE endpoint | The implemented realtime path holds long-lived process and client connections that ordinary serverless request functions cannot guarantee | Local development uses Docker Compose; production needs a production build, managed PostgreSQL, TLS termination, and persistent runtime |
 
-**Note on Supabase vs. plain Socket.io:** either would satisfy the real-time requirement. Supabase Realtime is preferred here because it needs no separately hosted server process (Socket.io would require a persistent Node process, which doesn't fit Vercel's serverless functions cleanly) and it reads directly off Postgres row changes rather than requiring the API layer to manually emit events on every mutation. If the platform later moves off Vercel to a host with long-lived processes, Socket.io remains a valid drop-in alternative — the rest of this document's real-time flow (Section 11) is unaffected by which of the two is used, since both broadcast the same event: "an Order row changed."
+The local container topology and its production boundary are documented in
+[docker-architecture.md](docker-architecture.md).
 
 ---
 
@@ -479,46 +482,54 @@ Final v1 stack decisions. Everything below is chosen specifically to keep v1 sim
 
 ### 11.1 How the admin dashboard subscribes
 
-1. When an admin opens the Orders page, the client establishes a Supabase Realtime subscription (a WebSocket connection) scoped to the `Order` table (optionally filtered, e.g., to recent orders).
-2. Supabase Realtime listens to Postgres's write-ahead log (logical replication) for INSERT/UPDATE events on `Order`.
-3. Any change to an `Order` row — created via checkout, or `status` updated via `PUT /admin/orders/:id/status` — is broadcast over that WebSocket to every currently-subscribed admin session.
-4. Multiple admins logged in simultaneously all receive the same broadcast — there's no polling and no "refresh to see updates."
+1. An order-changing transaction writes the business rows and an `OutboxEvent`
+   in the same commit.
+2. The in-process dispatcher claims unpublished outbox rows and publishes a
+   minimal event through PostgreSQL `NOTIFY`.
+3. The application’s persistent PostgreSQL listener receives the notification.
+4. Authenticated admin pages hold an SSE connection to
+   `/api/admin/realtime`; each event tells React Query which data to invalidate.
+5. Multiple connected admin sessions receive the same committed change.
 
 ### 11.2 Data flow
 
 ```
-DB write (Order.status changes)
+Order transaction
         │
         ▼
-Postgres logical replication stream
+OutboxEvent committed with business rows
         │
         ▼
-Supabase Realtime service (detects row change, matches subscriptions)
+Outbox dispatcher → PostgreSQL NOTIFY
         │
         ▼
-WebSocket push ──────▶ Admin Browser Tab 1
+Persistent app listener → authenticated SSE
         │
-        └────────────▶ Admin Browser Tab 2 (any other logged-in admin)
+        ├────────────▶ Admin Browser Tab 1
+        └────────────▶ Admin Browser Tab 2
 ```
 
 ### 11.3 What is (and isn't) sent
 
-- Only the changed `Order` row's data is broadcast (id, new status, updated_at, etc.) — this is a UI-refresh signal, not a customer notification.
+- A minimal event is broadcast as a UI-refresh signal; authoritative data is
+  fetched again through the normal API.
 - No email/SMS/push notification is sent to the client or guest who placed the order (explicitly deferred to v2 — see the "Deferred to v2" list).
 - The client-facing order pages (`GET /orders/:id`) are not required to be real-time in v1 — a client can simply refetch/reload to see status changes; only the _admin_ dashboard requires live updates, since admin is the one actively managing multiple orders at once.
 
 ### 11.4 How React Query handles syncing
 
-- Each incoming Realtime event triggers a call to `queryClient.invalidateQueries(['orders'])` (and `['orders', orderId]` if the detail view is open).
+- Each incoming SSE event invalidates the affected React Query order keys.
 - React Query then refetches the affected query from the API in the background and re-renders the UI with fresh data — this reuses the exact same fetch path the page uses on initial load, so there's no separate "real-time data shape" to maintain.
-- This keeps Realtime's job narrow: it only has to say "something changed," not carry the full updated dataset — React Query's normal cache/fetch/render cycle does the rest.
+- This keeps realtime narrow: it says “something changed”; React Query’s normal
+  cache/fetch/render cycle retrieves the canonical representation.
 
-### 11.5 WebSocket connection management
+### 11.5 SSE connection management
 
-- One WebSocket connection per admin browser tab, opened when the Orders (or dashboard) page mounts and closed when it unmounts/navigates away.
-- Supabase's client library handles reconnection automatically on network drop.
-- Connections are only opened for authenticated admin sessions — clients and guests never open a Realtime subscription in v1.
-- No connection is held by serverless API routes themselves — the subscription is entirely between the admin's browser and the Supabase Realtime service, so it doesn't consume Vercel function time.
+- One SSE connection is opened per mounted admin realtime client.
+- The browser reconnects when the SSE connection drops.
+- The endpoint authenticates the user and accepts admin sessions only.
+- The listener, dispatcher, and SSE responses require a long-running Node
+  runtime; this is an explicit production constraint.
 
 ---
 
@@ -628,52 +639,63 @@ All analytics endpoints are admin-only and read-only — they compute aggregates
 **Scenario: admin marks an order as "Shipped"**
 
 ```
-Admin UI                Backend (API route)         Database              Supabase Realtime        Other Admin Sessions
-   │  PUT /admin/orders/:id/status  │                    │                        │                        │
-   │ ──────────────────────────────▶│                    │                        │                        │
-   │                                 │  UPDATE Order SET  │                        │                        │
-   │                                 │  status='Shipped' ▶│                        │                        │
-   │                                 │◀── success ────────│                        │                        │
-   │◀──── 200 OK ────────────────────│                    │  row change detected  ▶│                        │
-   │                                 │                    │   (WAL / replication)  │  broadcast event  ────▶│
-   │  React Query invalidates        │                    │                        │                        │  React Query invalidates
-   │  ['orders'] on this session too │                    │                        │                        │  ['orders'] here too
-   │  (from its own mutation's       │                    │                        │                        │
-   │   onSuccess) ─── list refetches │                    │                        │                        │  list refetches, re-renders
-   │   and re-renders instantly      │                    │                        │                        │  instantly — no page reload
+Admin UI         API/service transaction       PostgreSQL/outbox       App SSE endpoint       Other admins
+   │ PUT status           │                           │                       │                   │
+   │─────────────────────▶│ update Order + history   │                       │                   │
+   │                      │ + OutboxEvent atomically ▶│                       │                   │
+   │◀────────── 200 ──────│                           │                       │                   │
+   │ invalidate/refetch   │              dispatcher claims event            │                   │
+   │                      │                           │── NOTIFY ─────────────▶│                   │
+   │                      │                           │                       │── SSE event ─────▶│
+   │                      │                           │                       │             invalidate/refetch
 ```
 
 Step by step:
 
 1. Admin (Session A) clicks "Mark as Shipped" → frontend calls `PUT /admin/orders/:id/status`.
 2. Backend API route updates `Order.status = 'Shipped'` in Postgres (inside the standard status-update logic; no stock change for this transition per Section 3.2).
-3. Postgres's row change is picked up by Supabase Realtime via logical replication.
-4. Supabase Realtime broadcasts the change to every subscribed admin WebSocket connection — including Session A itself and any other admin (Session B, C, …) currently viewing the Orders page.
-5. Each admin dashboard's Realtime listener receives the event and calls `queryClient.invalidateQueries(['orders'])`.
+3. The same transaction inserts an outbox event.
+4. The dispatcher publishes the committed event through PostgreSQL
+   `LISTEN/NOTIFY`; the application listener forwards it to authenticated admin
+   SSE clients.
+5. Each admin client invalidates the relevant React Query keys.
 6. React Query refetches the orders list in the background and re-renders — the order's row updates to show "Shipped" instantly, on every connected admin session, with no manual refresh.
 
 ---
 
 ## 17. Performance Considerations for ~100 Concurrent Users
 
-- **Database connection pooling:** Prisma's connection pool (or an external pooler such as PgBouncer/Supabase's built-in pooler, recommended when deploying to Vercel's serverless functions, since each function invocation can open a new connection) keeps the number of live Postgres connections bounded even under bursts of concurrent requests. At ~100 concurrent users, a modest pool size (e.g., the default or a small fixed pool) is sufficient — no custom tuning expected for v1.
+- **Database connection pooling:** Prisma's connection pool keeps ordinary
+  request connections bounded. The realtime listener uses a dedicated
+  PostgreSQL connection. A production pooler may be used, but it must support
+  session-level `LISTEN/NOTIFY` behavior for that dedicated connection.
 - **Caching:** not needed for v1. Product/category listings and order queries are simple, indexed lookups against Postgres, and at this scale direct queries are fast enough — adding a cache layer (e.g., Redis) now would be premature complexity.
-- **Real-time connection limit:** WebSocket connections are only opened by authenticated admin sessions (Section 11.5), not by every client/guest — realistically this is a handful of concurrent connections (however many admins are logged in at once), nowhere near a scaling concern even under Supabase's free/starter tier limits. Client/guest traffic (the bulk of the 100 concurrent users) never opens a Realtime subscription in v1.
+- **Real-time connection limit:** SSE connections are opened only by
+  authenticated admin sessions, not every client or guest. The long-running
+  runtime and reverse proxy must permit streaming responses.
 - **When to add caching (v2 signal):** if product listing/search queries start showing up as slow under real traffic (monitor via basic query timing), or if the Orders dashboard query becomes expensive as historical order volume grows into the tens of thousands of rows, that's the trigger to introduce either a cache layer or the composite indexes flagged in Section 13 — not before, and not speculatively in v1.
 
 ---
 
 ## 18. Deployment Checklist
 
-- [ ] **PostgreSQL database provisioned** (v15+), connection string obtained, and reachable from Vercel.
+- [ ] **PostgreSQL database provisioned** (v15+), connection string obtained,
+      reachable from the application runtime, and compatible with
+      `LISTEN/NOTIFY`.
 - [ ] **Prisma migrations applied** to the target database (`prisma migrate deploy` in production, not `migrate dev`).
-- [ ] **Vercel project created** and linked to the repository; both the Next.js frontend and API routes deploy together as one project.
+- [ ] **Long-running Node runtime provisioned** with a production Next.js build,
+      persistent SSE support, and a readiness probe against `/api/health`.
+- [ ] **TLS/reverse proxy configured** with streaming/buffering settings
+      appropriate for SSE and the correct public `APP_ORIGIN`.
 - [ ] **Cloudinary account configured**, API key/secret/cloud name added as environment variables.
-- [ ] **Supabase project configured** for Realtime: Realtime enabled on the `Order` table, connection/anon key obtained for the frontend subscription client.
-- [ ] **Environment variables set** in both `.env.local` (local dev) and Vercel's production environment variable settings — at minimum: `DATABASE_URL`, `JWT_SECRET`, `CLOUDINARY_CLOUD_NAME`/`API_KEY`/`API_SECRET`, `SUPABASE_URL`/`SUPABASE_ANON_KEY`.
+- [ ] **Environment variables set** in root `.env` for local Compose and in the
+      production platform’s secret manager; never bake secrets into images.
 - [ ] **JWT secret** generated as a strong random value, never reused from a dev/example value in production.
-- [ ] **Seed/bootstrap admin account** created directly in the database (pending answer to Open Question 3 in Section 9) before go-live, so there is at least one way to log into the admin dashboard.
-- [ ] **Verify Realtime subscription works end-to-end** in the deployed environment (not just locally) before relying on it for admin operations — confirm a status change made in one browser session appears live in another.
+- [ ] **Bootstrap admin created** from `ADMIN_EMAIL`/`ADMIN_PASSWORD` using the
+      seed in the intended environment; do not run the development catalog seed
+      against production unintentionally.
+- [ ] **Verify outbox, PostgreSQL notification, and authenticated SSE delivery**
+      end-to-end in the deployed environment.
 
 ---
 
