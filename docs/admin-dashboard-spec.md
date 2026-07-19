@@ -234,9 +234,8 @@ The core working page for day-to-day admin activity.
 ├───────────────┬───────────┬────────┬───────────┬────────┬─────┤
 │ Name            │ Category    │ Price   │ Variants   │ Status  │ Action│
 ├───────────────┼───────────┼────────┼───────────┼────────┼─────┤
-│ Red T-Shirt      │ Apparel     │ $15.00  │ 3 variants  │ Active  │ [Edit][Manage Variants][Delete] │
-│ Blue Jeans        │ Apparel     │ $40.00  │ 2 variants  │ Active  │ [Edit][Manage Variants][Delete] │
-│ Old Item          │ Misc        │ $9.00   │ 1 variant   │ Inactive│ [Edit][Manage Variants][Delete] │
+│ Red T-Shirt      │ Apparel     │ $15.00  │ 3 variants  │ Active   │ [Edit][Variants][Archive][Delete permanently] │
+│ Old Item         │ Misc        │ $9.00   │ 1 variant   │ Archived │ [Edit][Variants][Restore][Delete permanently] │
 └───────────────┴───────────┴────────┴───────────┴────────┴─────┘
 ```
 
@@ -246,10 +245,17 @@ The core working page for day-to-day admin activity.
 | Category       | Single category the product belongs to                                             |
 | Price          | Base price (variants may override individually)                                    |
 | Variants count | e.g., "3 variants" — clicking "Manage Variants" opens the variant list             |
-| Status         | Active / Inactive badge (soft-deleted or manually disabled products show Inactive) |
-| Action         | Edit, Manage Variants, Delete buttons                                              |
+| Status         | Active / Archived badge                                                            |
+| Action         | Edit, Manage Variants, Archive or Restore, and Delete permanently                   |
 
 "Create New Product" opens the same form as Edit, blank.
+
+Archive is the primary lifecycle action. It hides the Product from every
+storefront path without changing SKU inventory and can be reversed with
+Restore. Permanent deletion is danger-styled, requires typing the exact Product
+name, and succeeds only when the Product and its SKUs have never appeared in an
+order. Ordered Products must remain archived and surface a clear conflict
+message when permanent deletion is attempted.
 
 ### Edit Product form
 

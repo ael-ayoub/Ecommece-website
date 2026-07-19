@@ -12,6 +12,7 @@ interface LockedVariantRow {
   id: number;
   productId: number;
   productName: string;
+  productImages: string[];
   productIsActive: boolean;
   variantLabel: string;
   sku: string;
@@ -25,8 +26,10 @@ export interface OrderLineSnapshot {
   variantId: number;
   productId: number;
   productNameSnapshot: string;
+  imageSnapshot: string | null;
   variantLabelSnapshot: string;
   skuSnapshot: string;
+  optionValuesSnapshot: Record<string, string>;
   unitPriceSnapshot: string;
   quantity: number;
 }
@@ -49,9 +52,26 @@ export async function lockAndDecrementStock(
   lines: StockLine[],
 ): Promise<OrderLineSnapshot[]> {
   const variantIds = lines.map((l) => l.variantId).sort((a, b) => a - b);
+  const candidateVariants = await tx.productVariant.findMany({
+    where: { id: { in: variantIds } },
+    select: { productId: true },
+  });
+  const productIds = Array.from(
+    new Set(candidateVariants.map((variant) => variant.productId)),
+  ).sort((a, b) => a - b);
+  if (productIds.length > 0) {
+    await tx.$queryRaw`
+      SELECT id
+      FROM "Product"
+      WHERE id IN (${Prisma.join(productIds)})
+      ORDER BY id
+      FOR UPDATE
+    `;
+  }
 
   const rows = await tx.$queryRaw<LockedVariantRow[]>`
-    SELECT v.id, v."productId", p.name AS "productName", p."isActive" AS "productIsActive",
+    SELECT v.id, v."productId", p.name AS "productName", p.images AS "productImages",
+           p."isActive" AS "productIsActive",
            v."variantLabel", v.sku, v.price, p."basePrice", v."stockQuantity", v."isActive"
     FROM "ProductVariant" v
     JOIN "Product" p ON p.id = v."productId"
@@ -77,6 +97,33 @@ export async function lockAndDecrementStock(
   }
 
   const snapshots: OrderLineSnapshot[] = [];
+  const optionSelections = await tx.productVariant.findMany({
+    where: { id: { in: variantIds } },
+    select: {
+      id: true,
+      optionValues: {
+        select: {
+          optionValue: {
+            select: {
+              value: true,
+              option: { select: { name: true, position: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+  const selectionsByVariant = new Map(
+    optionSelections.map((variant) => [
+      variant.id,
+      Object.fromEntries(
+        variant.optionValues
+          .map(({ optionValue }) => optionValue)
+          .sort((a, b) => a.option.position - b.option.position)
+          .map((optionValue) => [optionValue.option.name, optionValue.value]),
+      ),
+    ]),
+  );
   for (const line of lines) {
     const row = byId.get(line.variantId)!;
     await tx.productVariant.update({
@@ -87,8 +134,10 @@ export async function lockAndDecrementStock(
       variantId: line.variantId,
       productId: row.productId,
       productNameSnapshot: row.productName,
+      imageSnapshot: row.productImages[0] ?? null,
       variantLabelSnapshot: row.variantLabel,
       skuSnapshot: row.sku,
+      optionValuesSnapshot: selectionsByVariant.get(row.id) ?? {},
       unitPriceSnapshot: (row.price ?? row.basePrice).toString(),
       quantity: line.quantity,
     });
@@ -104,7 +153,10 @@ export async function lockAndDecrementStock(
  * implementation of "how stock comes back," per architecture.md §4's
  * all-or-nothing restoration rule.
  */
-export async function restoreStock(tx: Tx, lines: { variantId: number; quantity: number }[]) {
+export async function restoreStock(
+  tx: Tx,
+  lines: { variantId: number; quantity: number }[],
+) {
   for (const line of lines) {
     await tx.productVariant.update({
       where: { id: line.variantId },

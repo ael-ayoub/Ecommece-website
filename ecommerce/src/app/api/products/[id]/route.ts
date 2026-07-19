@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getProductById, updateProduct, softDeleteProduct } from "@/services/product.service";
+import {
+  getProductById,
+  permanentlyDeleteProduct,
+  updateProduct,
+} from "@/services/product.service";
 import { productUpdateSchema } from "@/lib/validators";
 import { requireAdmin } from "@/lib/guards/require-admin";
 import { getCurrentUser } from "@/lib/get-current-user";
@@ -41,7 +45,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   try {
     assertSameOrigin(req);
     await requireAdmin();
-    await softDeleteProduct(Number(params.id));
+    await permanentlyDeleteProduct(Number(params.id));
     return NextResponse.json({ success: true });
   } catch (err) {
     return handleApiError(err);

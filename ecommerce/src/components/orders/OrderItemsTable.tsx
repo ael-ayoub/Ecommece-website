@@ -26,11 +26,25 @@ export function OrderItemsTable({
           const unitPrice = item.variant?.unitPriceSnapshot ?? "0";
           return (
             <tr key={item.id} className="border-b border-gray-100">
-              <td className="py-2">{item.productNameSnapshot}</td>
+              <td className="py-2">
+                <span>{item.productNameSnapshot}</span>
+                {!item.product ? (
+                  <span className="ml-2 text-xs text-gray-500">Product no longer available</span>
+                ) : null}
+              </td>
               <td>
                 {item.variant
                   ? `${item.variant.skuSnapshot} / ${item.variant.variantLabelSnapshot}`
                   : "—"}
+                {item.variant?.optionValuesSnapshot &&
+                typeof item.variant.optionValuesSnapshot === "object" &&
+                !Array.isArray(item.variant.optionValuesSnapshot) ? (
+                  <span className="block text-xs text-gray-500">
+                    {Object.entries(item.variant.optionValuesSnapshot)
+                      .map(([name, value]) => `${name}: ${String(value)}`)
+                      .join(" · ")}
+                  </span>
+                ) : null}
               </td>
               <td>{qty}</td>
               <td>{formatCurrency(unitPrice)}</td>

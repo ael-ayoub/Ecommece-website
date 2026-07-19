@@ -117,7 +117,10 @@ src/app/
 │   ├── products/
 │   │   ├── route.ts           # GET (list), POST (admin create)
 │   │   ├── [id]/route.ts      # GET/PUT/DELETE
-│   │   └── [id]/variants/route.ts
+│   │   └── [id]/
+│   │       ├── archive/route.ts
+│   │       ├── restore/route.ts
+│   │       └── variants/route.ts
 │   ├── categories/{route.ts, [id]/route.ts}
 │   ├── cart/route.ts
 │   ├── orders/

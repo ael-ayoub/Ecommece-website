@@ -82,11 +82,13 @@ export async function createOrder(
             create: lines.map((line) => ({
               productId: line.productId,
               productNameSnapshot: line.productNameSnapshot,
+              imageSnapshot: line.imageSnapshot,
               variant: {
                 create: {
                   productVariantId: line.variantId,
                   variantLabelSnapshot: line.variantLabelSnapshot,
                   skuSnapshot: line.skuSnapshot,
+                  optionValuesSnapshot: line.optionValuesSnapshot,
                   unitPriceSnapshot: line.unitPriceSnapshot,
                   quantity: line.quantity,
                 },

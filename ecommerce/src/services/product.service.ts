@@ -25,7 +25,7 @@ export interface ListProductsParams {
   pageSize?: number;
   categorySlug?: string;
   search?: string;
-  /** Admin views need inactive (soft-deleted) products too; public views never do. */
+  /** Admin views need archived products too; public views never do. */
   includeInactive?: boolean;
 }
 
@@ -49,13 +49,23 @@ function withDerivedInventory<
   T extends {
     basePrice: Prisma.Decimal;
     isActive: boolean;
-    variants: { isActive: boolean; stockQuantity: number; price: Prisma.Decimal | null }[];
+    variants: {
+      isActive: boolean;
+      stockQuantity: number;
+      price: Prisma.Decimal | null;
+    }[];
   },
 >(product: T) {
   const activeVariants = product.variants.filter((variant) => variant.isActive);
-  const totalStock = activeVariants.reduce((sum, variant) => sum + variant.stockQuantity, 0);
+  const totalStock = activeVariants.reduce(
+    (sum, variant) => sum + variant.stockQuantity,
+    0,
+  );
   const prices = activeVariants.map((variant) =>
-    effectivePrice(product.basePrice.toString(), variant.price?.toString() ?? null),
+    effectivePrice(
+      product.basePrice.toString(),
+      variant.price?.toString() ?? null,
+    ),
   );
   const availability: "AVAILABLE" | "OUT_OF_STOCK" | "UNAVAILABLE" =
     !product.isActive || activeVariants.length === 0
@@ -68,8 +78,12 @@ function withDerivedInventory<
     totalStock,
     skuCount: product.variants.length,
     availability,
-    minPrice: prices.length ? Math.min(...prices).toFixed(2) : product.basePrice.toFixed(2),
-    maxPrice: prices.length ? Math.max(...prices).toFixed(2) : product.basePrice.toFixed(2),
+    minPrice: prices.length
+      ? Math.min(...prices).toFixed(2)
+      : product.basePrice.toFixed(2),
+    maxPrice: prices.length
+      ? Math.max(...prices).toFixed(2)
+      : product.basePrice.toFixed(2),
   };
 }
 
@@ -84,8 +98,17 @@ export async function listProducts(params: ListProductsParams) {
       ? {
           OR: [
             { name: { contains: params.search, mode: "insensitive" as const } },
-            { description: { contains: params.search, mode: "insensitive" as const } },
-            { category: { name: { contains: params.search, mode: "insensitive" as const } } },
+            {
+              description: {
+                contains: params.search,
+                mode: "insensitive" as const,
+              },
+            },
+            {
+              category: {
+                name: { contains: params.search, mode: "insensitive" as const },
+              },
+            },
           ],
         }
       : {}),
@@ -111,7 +134,10 @@ export async function listProducts(params: ListProductsParams) {
   };
 }
 
-export async function getProductById(id: number, opts: { includeInactive?: boolean } = {}) {
+export async function getProductById(
+  id: number,
+  opts: { includeInactive?: boolean } = {},
+) {
   const product = await db.product.findUnique({
     where: { id },
     include: productInclude,
@@ -124,7 +150,10 @@ export async function getProductById(id: number, opts: { includeInactive?: boole
   return withDerivedInventory(product);
 }
 
-export async function createProduct(input: ProductCreateInput, adminUserId?: number) {
+export async function createProduct(
+  input: ProductCreateInput,
+  adminUserId?: number,
+) {
   try {
     const created = await db.$transaction(async (tx) => {
       if (input.productType === "SIMPLE") {
@@ -160,7 +189,9 @@ export async function createProduct(input: ProductCreateInput, adminUserId?: num
       }));
       const optionNames = options.map((option) => option.name);
       const allowed = new Set(
-        generateOptionCombinations(options).map((values) => combinationKey(values, optionNames)),
+        generateOptionCombinations(options).map((values) =>
+          combinationKey(values, optionNames),
+        ),
       );
       const seen = new Set<string>();
       for (const variant of input.variants) {
@@ -173,7 +204,10 @@ export async function createProduct(input: ProductCreateInput, adminUserId?: num
         const submittedNames = Object.keys(normalizedValues);
         if (
           submittedNames.length !== optionNames.length ||
-          optionNames.some((name) => !Object.prototype.hasOwnProperty.call(normalizedValues, name))
+          optionNames.some(
+            (name) =>
+              !Object.prototype.hasOwnProperty.call(normalizedValues, name),
+          )
         ) {
           throw new ConflictError(
             "Each explicit SKU must select exactly one value from every Product option and no unknown options.",
@@ -204,11 +238,21 @@ export async function createProduct(input: ProductCreateInput, adminUserId?: num
       const optionValueIds = new Map<string, number>();
       for (const [optionPosition, option] of Array.from(options.entries())) {
         const createdOption = await tx.productOption.create({
-          data: { productId: product.id, name: option.name, position: optionPosition },
+          data: {
+            productId: product.id,
+            name: option.name,
+            position: optionPosition,
+          },
         });
-        for (const [valuePosition, value] of Array.from(option.values.entries())) {
+        for (const [valuePosition, value] of Array.from(
+          option.values.entries(),
+        )) {
           const createdValue = await tx.productOptionValue.create({
-            data: { optionId: createdOption.id, value, position: valuePosition },
+            data: {
+              optionId: createdOption.id,
+              value,
+              position: valuePosition,
+            },
           });
           optionValueIds.set(`${option.name}\u0000${value}`, createdValue.id);
         }
@@ -221,13 +265,16 @@ export async function createProduct(input: ProductCreateInput, adminUserId?: num
             normalizeOptionText(value),
           ]),
         );
-        const orderedValues = optionNames.map((name) => normalizedValues[name] ?? "");
+        const orderedValues = optionNames.map(
+          (name) => normalizedValues[name] ?? "",
+        );
         const key = combinationKey(normalizedValues, optionNames);
         const createdVariant = await tx.productVariant.create({
           data: {
             productId: product.id,
             sku: normalizeSku(variant.sku),
-            variantLabel: variant.variantLabel?.trim() || orderedValues.join(" / "),
+            variantLabel:
+              variant.variantLabel?.trim() || orderedValues.join(" / "),
             isDefault: false,
             optionCombinationKey: key,
             price: variant.price == null ? null : variant.price.toFixed(2),
@@ -238,7 +285,9 @@ export async function createProduct(input: ProductCreateInput, adminUserId?: num
         await tx.productVariantOptionValue.createMany({
           data: optionNames.map((name, index) => ({
             variantId: createdVariant.id,
-            optionValueId: optionValueIds.get(`${name}\u0000${orderedValues[index]}`)!,
+            optionValueId: optionValueIds.get(
+              `${name}\u0000${orderedValues[index]}`,
+            )!,
           })),
         });
       }
@@ -250,8 +299,15 @@ export async function createProduct(input: ProductCreateInput, adminUserId?: num
       if (!created) throw new NotFoundError("Product creation failed.");
       return withDerivedInventory(created);
     });
-    if (input.productType === "CONFIGURABLE" && adminUserId && input.sourceTemplateIds?.length) {
-      await recordOptionTemplateUsage(adminUserId, input.sourceTemplateIds).catch(() => {
+    if (
+      input.productType === "CONFIGURABLE" &&
+      adminUserId &&
+      input.sourceTemplateIds?.length
+    ) {
+      await recordOptionTemplateUsage(
+        adminUserId,
+        input.sourceTemplateIds,
+      ).catch(() => {
         logger.warn("option_template_usage_update_failed", {
           productId: created.id,
           category: "non_critical_usage_tracking",
@@ -260,8 +316,13 @@ export async function createProduct(input: ProductCreateInput, adminUserId?: num
     }
     return created;
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      throw new ConflictError("A SKU, option name, or option value is already in use.");
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      throw new ConflictError(
+        "A SKU, option name, or option value is already in use.",
+      );
     }
     throw error;
   }
@@ -274,29 +335,94 @@ export async function updateProduct(id: number, input: ProductUpdateInput) {
     where: { id },
     data: {
       ...(input.name !== undefined ? { name: input.name } : {}),
-      ...(input.description !== undefined ? { description: input.description } : {}),
-      ...(input.basePrice !== undefined ? { basePrice: input.basePrice.toFixed(2) } : {}),
-      ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}),
+      ...(input.description !== undefined
+        ? { description: input.description }
+        : {}),
+      ...(input.basePrice !== undefined
+        ? { basePrice: input.basePrice.toFixed(2) }
+        : {}),
+      ...(input.categoryId !== undefined
+        ? { categoryId: input.categoryId }
+        : {}),
       ...(input.images !== undefined ? { images: input.images } : {}),
       ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
-      ...(input.showExactStock !== undefined ? { showExactStock: input.showExactStock } : {}),
+      ...(input.showExactStock !== undefined
+        ? { showExactStock: input.showExactStock }
+        : {}),
     },
     include: productInclude,
   });
 }
 
-// Soft delete only — architecture.md's business rules: historical OrderItems
-// snapshot product data, so a product is never hard-deleted, just hidden from
-// browse/search via isActive = false.
-export async function softDeleteProduct(id: number) {
-  await getProductById(id, { includeInactive: true });
-  return db.product.update({ where: { id }, data: { isActive: false } });
+export async function archiveProduct(id: number) {
+  return db.$transaction(async (tx) => {
+    const rows = await tx.$queryRaw<Array<{ id: number }>>`
+      SELECT id FROM "Product" WHERE id = ${id} FOR UPDATE
+    `;
+    if (rows.length === 0) throw new NotFoundError("Product not found.");
+    return tx.product.update({ where: { id }, data: { isActive: false } });
+  });
+}
+
+export async function restoreProduct(id: number) {
+  return db.$transaction(async (tx) => {
+    const rows = await tx.$queryRaw<Array<{ id: number }>>`
+      SELECT id FROM "Product" WHERE id = ${id} FOR UPDATE
+    `;
+    if (rows.length === 0) throw new NotFoundError("Product not found.");
+    return tx.product.update({ where: { id }, data: { isActive: true } });
+  });
+}
+
+/**
+ * Permanently removes catalog rows only when no historical order references
+ * the Product or any of its SKUs. Ordered Products remain archived so later
+ * cancellation/return can still restore stock to the original SKU.
+ */
+export async function permanentlyDeleteProduct(id: number) {
+  return db.$transaction(async (tx) => {
+    const products = await tx.$queryRaw<Array<{ id: number }>>`
+      SELECT id FROM "Product" WHERE id = ${id} FOR UPDATE
+    `;
+    if (products.length === 0) throw new NotFoundError("Product not found.");
+    await tx.$queryRaw`
+      SELECT id
+      FROM "ProductVariant"
+      WHERE "productId" = ${id}
+      ORDER BY id
+      FOR UPDATE
+    `;
+
+    const [productOrderCount, variantOrderCount] = await Promise.all([
+      tx.orderItem.count({ where: { productId: id } }),
+      tx.orderItemVariant.count({
+        where: { productVariant: { is: { productId: id } } },
+      }),
+    ]);
+    if (productOrderCount > 0 || variantOrderCount > 0) {
+      throw new ConflictError(
+        "This Product has order history and cannot be permanently deleted. Archive it instead.",
+      );
+    }
+
+    await tx.productVariantOptionValue.deleteMany({
+      where: { variant: { productId: id } },
+    });
+    await tx.productOptionValue.deleteMany({
+      where: { option: { productId: id } },
+    });
+    await tx.productOption.deleteMany({ where: { productId: id } });
+    await tx.productVariant.deleteMany({ where: { productId: id } });
+    await tx.product.delete({ where: { id } });
+  });
 }
 
 export async function addVariant(productId: number, input: VariantCreateInput) {
   const product = await getProductById(productId, { includeInactive: true });
   if (product.productType === ProductType.SIMPLE) {
-    throw new ConflictError("Simple product type is immutable and cannot receive another SKU.");
+    throw new ConflictError(
+      "Simple product type is immutable and cannot receive another SKU.",
+    );
   }
 
   const optionNames = product.options.map((option) => option.name);
@@ -305,7 +431,9 @@ export async function addVariant(productId: number, input: VariantCreateInput) {
     const submittedNames = Object.keys(selected);
     if (
       submittedNames.length !== optionNames.length ||
-      optionNames.some((name) => !Object.prototype.hasOwnProperty.call(selected, name))
+      optionNames.some(
+        (name) => !Object.prototype.hasOwnProperty.call(selected, name),
+      )
     ) {
       throw new ConflictError(
         "Select exactly one value from every Product option and no unknown options.",
@@ -313,8 +441,11 @@ export async function addVariant(productId: number, input: VariantCreateInput) {
     }
     const key = combinationKey(selected, optionNames);
     const valueIds = product.options.map((option) => {
-      const value = option.values.find((candidate) => candidate.value === selected[option.name]);
-      if (!value) throw new ConflictError(`Select one valid value for ${option.name}.`);
+      const value = option.values.find(
+        (candidate) => candidate.value === selected[option.name],
+      );
+      if (!value)
+        throw new ConflictError(`Select one valid value for ${option.name}.`);
       return value.id;
     });
     try {
@@ -332,12 +463,18 @@ export async function addVariant(productId: number, input: VariantCreateInput) {
           },
         });
         await tx.productVariantOptionValue.createMany({
-          data: valueIds.map((optionValueId) => ({ variantId: variant.id, optionValueId })),
+          data: valueIds.map((optionValueId) => ({
+            variantId: variant.id,
+            optionValueId,
+          })),
         });
         return variant;
       });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
         throw new ConflictError("This combination or SKU already exists.");
       }
       throw error;
@@ -361,7 +498,9 @@ export async function updateVariant(
   variantId: number,
   input: VariantUpdateInput,
 ) {
-  const variant = await db.productVariant.findFirst({ where: { id: variantId, productId } });
+  const variant = await db.productVariant.findFirst({
+    where: { id: variantId, productId },
+  });
   if (!variant) {
     throw new NotFoundError("Variant not found.");
   }
@@ -369,18 +508,27 @@ export async function updateVariant(
   return db.productVariant.update({
     where: { id: variantId, productId },
     data: {
-      ...(input.variantLabel !== undefined ? { variantLabel: input.variantLabel } : {}),
+      ...(input.variantLabel !== undefined
+        ? { variantLabel: input.variantLabel }
+        : {}),
       ...(input.sku !== undefined ? { sku: normalizeSku(input.sku) } : {}),
       ...(input.price !== undefined ? { price: input.price.toFixed(2) } : {}),
-      ...(input.stockQuantity !== undefined ? { stockQuantity: input.stockQuantity } : {}),
+      ...(input.stockQuantity !== undefined
+        ? { stockQuantity: input.stockQuantity }
+        : {}),
       ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
     },
   });
 }
 
-export async function batchUpdateVariants(productId: number, input: VariantBatchUpdateInput) {
+export async function batchUpdateVariants(
+  productId: number,
+  input: VariantBatchUpdateInput,
+) {
   const ids = input.updates.map((update) => update.id);
-  const existing = await db.productVariant.findMany({ where: { productId, id: { in: ids } } });
+  const existing = await db.productVariant.findMany({
+    where: { productId, id: { in: ids } },
+  });
   if (existing.length !== new Set(ids).size)
     throw new NotFoundError("One or more SKUs were not found.");
   try {
@@ -389,21 +537,32 @@ export async function batchUpdateVariants(productId: number, input: VariantBatch
         db.productVariant.update({
           where: { id: update.id, productId },
           data: {
-            ...(update.sku !== undefined ? { sku: normalizeSku(update.sku) } : {}),
+            ...(update.sku !== undefined
+              ? { sku: normalizeSku(update.sku) }
+              : {}),
             ...(update.variantLabel !== undefined
               ? { variantLabel: update.variantLabel.trim() }
               : {}),
-            ...(update.stockQuantity !== undefined ? { stockQuantity: update.stockQuantity } : {}),
-            ...(update.price !== undefined
-              ? { price: update.price === null ? null : update.price.toFixed(2) }
+            ...(update.stockQuantity !== undefined
+              ? { stockQuantity: update.stockQuantity }
               : {}),
-            ...(update.isActive !== undefined ? { isActive: update.isActive } : {}),
+            ...(update.price !== undefined
+              ? {
+                  price: update.price === null ? null : update.price.toFixed(2),
+                }
+              : {}),
+            ...(update.isActive !== undefined
+              ? { isActive: update.isActive }
+              : {}),
           },
         }),
       ),
     );
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
       throw new ConflictError("A SKU code in this batch is already in use.");
     }
     throw error;

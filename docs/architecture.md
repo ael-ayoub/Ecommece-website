@@ -26,6 +26,32 @@ ProductVariant rows. Missing combinations mean Not offered; an existing active
 SKU with zero stock means Out of stock. Variant labels are editable presentation
 data, while optionCombinationKey remains the stable combination identity.
 
+## Product lifecycle and immutable order history
+
+Archive and permanent deletion are distinct operations:
+
+- **Archive** sets `Product.isActive = false`. It leaves SKUs, stock, options,
+  and order relations unchanged. Public listing, search, category browsing,
+  direct detail access, and checkout exclude archived Products. Admins can
+  continue to edit and later restore them.
+- **Restore** sets `Product.isActive = true`. SKU active states and stock remain
+  whatever they were before and during the archive period.
+- **Permanent deletion** is permitted only when neither the Product nor any of
+  its SKUs has appeared in an order. Related option associations, option
+  values, options, and SKUs are removed in one transaction. No stock
+  decrement, restoration, or reservation is performed.
+- A Product with order history can never be permanently deleted. It remains
+  archived so cancellation or return can restore inventory to the original
+  SKU.
+
+Order history uses immutable checkout snapshots. `OrderItem` stores Product
+name and image snapshots; its one-to-one `OrderItemVariant` stores SKU, variant
+label, structured option selections, unit price, and quantity. Line subtotal
+is derived from immutable unit price × quantity, and `Order.totalAmount` is
+stored. Discounts and taxes are not modeled in v1. Nullable Product/SKU
+relations are convenience links only; historical rendering never reads live
+names, labels, SKUs, or prices.
+
 ## Production-hardening baseline
 
 Checkout canonicalizes duplicate variant lines, locks variants in ascending ID
@@ -247,13 +273,14 @@ A line item within an order — the frozen record of one variant, quantity, and 
 | ---------------------- | ---------------------------------------------------------------- |
 | id                     | Primary key                                                      |
 | order_id               | FK → Order                                                       |
-| product_variant_id     | FK → ProductVariant                                              |
+| product_id             | Nullable FK → Product; convenience link only                    |
 | product_name_snapshot  | Name at time of purchase (survives later product edits/deletion) |
-| variant_label_snapshot | Variant label at time of purchase                                |
-| unit_price_snapshot    | Price at time of purchase                                        |
-| quantity               | Units ordered                                                    |
+| image_snapshot         | Primary Product image at checkout, nullable                      |
 
-**Relationships:** Many OrderItems belong to one Order. Each OrderItem references exactly one ProductVariant (this _is_ the "OrderItemVariant" concept — v1 does not need a separate join table since one OrderItem = one variant + quantity).
+Each OrderItem has an optional one-to-one `OrderItemVariant` containing the
+nullable live `product_variant_id` convenience link plus immutable
+`variant_label_snapshot`, `sku_snapshot`, `option_values_snapshot`,
+`unit_price_snapshot`, and `quantity`.
 
 **Why it exists:** Decouples historical orders from live product data — if a product/variant is later edited, renamed, repriced, or deactivated, past orders still show what the customer actually saw and paid.
 
@@ -333,7 +360,9 @@ DELETE /admin/categories/:id
 
 POST   /admin/products
 PUT    /admin/products/:id
-DELETE /admin/products/:id            (soft delete — see 8. Business Rules)
+POST   /api/products/:id/archive      (archive; reversible)
+POST   /api/products/:id/restore      (restore archived Product)
+DELETE /api/products/:id              (permanent; unordered Products only)
 
 POST   /admin/products/:id/variants
 PUT    /admin/products/:id/variants/:variantId          (edit price/label/stock)
@@ -435,7 +464,11 @@ PUT    /users/me                      (update own profile)
 - A ProductVariant must always belong to exactly one Product — it cannot exist independently.
 - A Client can only cancel an order that (a) belongs to them and (b) is currently Pending; any other combination is rejected.
 - Guest orders can never be cancelled by the guest under any circumstance (no identity to authorize the action).
-- Deleting a Product (admin) is a **soft delete** (`is_active = false`) — historical OrderItems reference snapshotted data, not a live Product, so removing/deactivating a product must never break past orders. The product simply stops appearing in browse/search results.
+- Archiving a Product sets `is_active = false`, changes no SKU stock, and
+  removes it from every public catalog/checkout path until restored.
+- Permanent deletion is allowed only for a Product that has never appeared in
+  an order. Ordered Products return a conflict and must remain archived so
+  cancellation/return can restore SKU inventory.
 - Order history is immutable and permanent — no order is ever hard-deleted regardless of its final status.
 - All quantity/stock changes affecting an order happen atomically with the status change that causes them (decrement with placement; restore with cancel/return) to avoid inconsistent intermediate states.
 
@@ -448,7 +481,8 @@ PUT    /users/me                      (update own profile)
 3. **Admin account creation:** resolved — the development seed upserts one
    administrator from `ADMIN_EMAIL` and `ADMIN_PASSWORD`; public registration
    creates client accounts only.
-4. **Product deletion when active orders reference it:** confirmed soft-delete approach — did you also want products with zero remaining variants (all deactivated) to auto-deactivate the parent product, or is that a manual admin action?
+4. **Product deletion:** resolved — archive is reversible and primary;
+   permanent deletion is limited to never-ordered Products.
 
 ---
 
@@ -570,14 +604,17 @@ This section restates the entities from Section 2 with explicit primary keys, fo
 | ------------------ | ----------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **User**           | `id`        | —                                                               | `email` (unique)                                                                        | `email` (login lookup); `role` (admin filtering users)                                                                                                                                          |
 | **Category**       | `id`        | —                                                               | `slug` (unique)                                                                         | `slug` (category page lookup)                                                                                                                                                                   |
-| **Product**        | `id`        | `category_id` → Category.id                                     | —                                                                                       | `category_id` (browse-by-category); composite/text index on `name`, `description` for search (Section 1: search by name/description/category); `is_active` (exclude soft-deleted from listings) |
+| **Product**        | `id`        | `category_id` → Category.id                                     | —                                                                                       | `category_id` (browse-by-category); `name`; `is_active` (exclude archived Products from public listings) |
 | **ProductVariant** | `id`        | `product_id` → Product.id                                       | (`product_id`, `variant_label`) unique — no duplicate variant labels within one product | `product_id` (fetch all variants for a product page); `is_active`                                                                                                                               |
 | **Cart**           | `id`        | `user_id` → User.id (nullable)                                  | —                                                                                       | `user_id` (fetch a logged-in user's cart)                                                                                                                                                       |
 | **CartItem**       | `id`        | `cart_id` → Cart.id; `product_variant_id` → ProductVariant.id   | (`cart_id`, `product_variant_id`) unique — one row per variant per cart                 | `cart_id`                                                                                                                                                                                       |
 | **Order**          | `id`        | `user_id` → User.id (nullable)                                  | —                                                                                       | `user_id` (client's own order history); `status` (admin filter by status — critical for the Orders dashboard page); `created_at` (date-range filtering, default sort newest-first)              |
-| **OrderItem**      | `id`        | `order_id` → Order.id; `product_variant_id` → ProductVariant.id | —                                                                                       | `order_id` (fetch all items for an order); `product_variant_id` (rare, e.g. "which orders included this variant")                                                                               |
+| **OrderItem**      | `id`        | `order_id` → Order.id; nullable `product_id` → Product.id (`SetNull`) | — | `order_id`; `product_id` |
+| **OrderItemVariant** | `id` | `order_item_id` → OrderItem.id; nullable `product_variant_id` → ProductVariant.id (`SetNull`) | `order_item_id` (one-to-one) | `product_variant_id` |
 
-**On "OrderItemVariant":** as noted in Section 2.7, v1 does not use a separate `OrderItemVariant` join table. Each `OrderItem` row directly references one `ProductVariant` plus a `quantity` and price/name/label snapshots — this is sufficient because an order line item is always exactly one variant at one price, never a multi-variant composite.
+`OrderItem` and `OrderItemVariant` are the immutable historical record.
+Nullable live relations must never be used to render purchased commercial
+values.
 
 **Composite index callout for admin performance:** the Orders page filters by status, client, and date range simultaneously, so a composite index on `Order(status, created_at)` (and optionally `Order(user_id, status)`) is worth adding once order volume grows — noted here as the first index to add if the Orders page query becomes slow, not required from day one at v1's expected scale.
 

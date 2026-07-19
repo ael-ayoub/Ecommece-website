@@ -10,6 +10,7 @@ export interface OrderItemVariantDto {
   id: number;
   variantLabelSnapshot: string;
   skuSnapshot: string;
+  optionValuesSnapshot: Prisma.JsonValue | null;
   unitPriceSnapshot: Money;
   quantity: number;
   productVariant: { id: number; isActive: boolean } | null;
@@ -19,6 +20,7 @@ export interface OrderItemDto {
   id: number;
   productId: number | null;
   productNameSnapshot: string;
+  imageSnapshot: string | null;
   product: { id: number; name: string; isActive: boolean } | null;
   variant: OrderItemVariantDto | null;
 }
