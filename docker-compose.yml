@@ -46,6 +46,14 @@ services:
 
     environment:
       APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
+      MEDIA_STORAGE_DRIVER: ${MEDIA_STORAGE_DRIVER:-local}
+      MEDIA_LOCAL_ROOT: ${MEDIA_LOCAL_ROOT:-/app/uploads}
+      MEDIA_PUBLIC_PATH: ${MEDIA_PUBLIC_PATH:-/media}
+      MEDIA_PUBLIC_BASE_URL: ${MEDIA_PUBLIC_BASE_URL:-http://localhost:3000}
+      MEDIA_MAX_FILE_SIZE_BYTES: ${MEDIA_MAX_FILE_SIZE_BYTES:-5242880}
+      MEDIA_ALLOWED_MIME_TYPES: ${MEDIA_ALLOWED_MIME_TYPES:-image/jpeg,image/png,image/webp}
+      MEDIA_MAX_IMAGES_PER_PRODUCT: ${MEDIA_MAX_IMAGES_PER_PRODUCT:-8}
+      MEDIA_MAX_IMAGE_PIXELS: ${MEDIA_MAX_IMAGE_PIXELS:-40000000}
 
     ports:
       - "3000:8080"
@@ -58,6 +66,7 @@ services:
       - ./ecommerce:/app
       - ecommerce_node_modules:/app/node_modules
       - ecommerce_next:/app/.next
+      - media_uploads:/app/uploads
 
     healthcheck:
       test:
@@ -81,3 +90,6 @@ volumes:
 
   ecommerce_next:
     name: ecommerce_next
+
+  media_uploads:
+    name: media_uploads

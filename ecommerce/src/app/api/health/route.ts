@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getMediaConfig } from "@/media/config";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   const timestamp = new Date().toISOString();
   try {
+    getMediaConfig();
     await db.$queryRaw`SELECT 1`;
     return NextResponse.json({
       status: "ready",

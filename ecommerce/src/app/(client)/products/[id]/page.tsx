@@ -3,6 +3,7 @@ import { getProductById } from "@/services/product.service";
 import { VariantSelector } from "@/components/products/VariantSelector";
 import { NotFoundError } from "@/lib/errors";
 import { formatCurrency } from "@/lib/format";
+import { ProductImage } from "@/components/products/ProductImage";
 
 interface Props {
   params: { id: string };
@@ -21,6 +22,16 @@ export default async function ProductDetailPage({ params }: Props) {
   const anyInStock = product.variants.some(
     (v) => v.isActive && v.stockQuantity > 0,
   );
+  const orderedImages =
+    product.imageRecords.length > 0
+      ? product.imageRecords
+      : product.images.map((url, position) => ({
+          id: -1 - position,
+          url,
+          altText: null,
+          position,
+          isPrimary: position === 0,
+        }));
 
   return (
     <div>
@@ -29,16 +40,28 @@ export default async function ProductDetailPage({ params }: Props) {
       </p>
 
       <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
-        <div className="flex aspect-square items-center justify-center rounded-lg bg-gray-100 text-gray-400">
-          {product.images[0] ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={product.images[0]}
-              alt={product.name}
-              className="h-full w-full rounded-lg object-cover"
-            />
+        <div>
+          {orderedImages.length > 0 ? (
+            <div className="grid grid-cols-2 gap-3">
+              {orderedImages.map((image, index) => (
+                <div
+                  key={image.id}
+                  className={`flex aspect-square items-center justify-center overflow-hidden rounded-lg bg-gray-100 ${
+                    index === 0 ? "col-span-2" : ""
+                  }`}
+                >
+                  <ProductImage
+                    src={image.url}
+                    alt={image.altText || `${product.name} image ${index + 1}`}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              ))}
+            </div>
           ) : (
-            <span>No image</span>
+            <div className="flex aspect-square items-center justify-center rounded-lg bg-gray-100 text-gray-500">
+              <span>Image unavailable</span>
+            </div>
           )}
         </div>
 

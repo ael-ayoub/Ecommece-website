@@ -199,13 +199,23 @@ The sellable item, before variant-specific detail.
 | name        | Product title                                  |
 | description | Used in text search                            |
 | base_price  | Default price (variants may override, see 2.4) |
-| images      | Product photos                                 |
+| legacy_image_urls | Compatibility fallback for pre-migration external image URLs |
 | is_active   | Soft-disable without deleting                  |
 | created_at  | Audit                                          |
 
-**Relationships:** One Product has many ProductVariants. One Product belongs to one Category.
+**Relationships:** One Product has many ProductVariants and ProductImages. One Product belongs to one Category.
 
-**Why it exists:** Holds shared descriptive data (name, description, images, category) that all variants of the same item share, so it isn't duplicated per variant.
+**Why it exists:** Holds shared descriptive data (name, description, category) that all variants of the same item share, so it isn't duplicated per variant.
+
+### 2.3.1 ProductImage
+
+Product-owned image metadata. `storage_key` is the portable canonical
+identifier; public URLs are resolved at response time from media
+configuration. `position` is unique within a Product, and a partial database
+index plus transactional service rules permit at most one primary image.
+Images cascade only with Product catalog deletion; no ProductVariant owns an
+image. Existing URL arrays remain a non-destructive fallback until separately
+migrated.
 
 ### 2.4 ProductVariant
 
@@ -372,6 +382,10 @@ PUT    /admin/products/:id
 POST   /api/products/:id/unpublish    (reversible)
 POST   /api/products/:id/publish      (reversible)
 DELETE /api/products/:id              (blocked by non-terminal orders)
+POST   /api/admin/products/:id/images
+PATCH  /api/admin/products/:id/images/:imageId
+DELETE /api/admin/products/:id/images/:imageId
+PATCH  /api/admin/products/:id/images/reorder
 
 PUT    /api/admin/clients/:id         (edit or activate/disable)
 DELETE /api/admin/clients/:id         (blocked by non-terminal orders)
@@ -515,7 +529,7 @@ Final v1 stack decisions. Everything below is chosen specifically to keep v1 sim
 | ORM                   | **Prisma**                               | Type-safe DB access, migrations, query builder                                    | Generates TypeScript types from the schema so API routes get compile-time safety; `prisma migrate` gives a clean, reviewable migration history                                                                                                                 | Used by every API route to read/write; also provides the transaction API used for stock-locking (Section 14)                                                                    |
 | Authentication        | **JWT + bcrypt (custom, in API routes)** | Issues signed session tokens on login; hashes/verifies passwords                  | Avoids pulling in a full third-party auth provider for a two-role (admin/client) system — a custom implementation is small enough to own directly and keeps auth logic co-located with the rest of the API                                                     | `bcrypt` hashes `User.password_hash`; JWT is issued at `/auth/login`, verified on every authenticated request, and its payload carries `user_id` + `role` for permission checks |
 | Real-time updates     | **PostgreSQL LISTEN/NOTIFY + transactional outbox + authenticated SSE** | Publishes committed order events to connected admin browsers | Keeps event creation transactional with order writes and avoids a second realtime vendor; requires a persistent Node process | The outbox dispatcher publishes notifications and `/api/admin/realtime` streams invalidation events (Section 11) |
-| Image handling        | **Cloudinary**                           | Hosts and serves product images (upload, storage, CDN delivery)                   | Offloads image storage/optimization so the app database and application container never handle persistent binary files                                                                                                                                          | `Product.images` store Cloudinary URLs; admin product form uploads directly to Cloudinary                                                                                       |
+| Image handling        | **MediaStorage + local filesystem adapter** | Validates, stores, and serves Product images through portable storage keys | Keeps Product business logic provider-independent while supporting the current local phase | `ProductImage` stores metadata; `media_uploads` persists files; `/media/*` serves controlled raster content |
 | Admin charts          | **Recharts**                             | React charting library (bar/line/pie charts)                                      | Lightweight, composable, and sufficient for the fixed set of v1 analytics charts (Section 12) — no need for a heavier BI tool                                                                                                                                  | Renders the charts on the Analytics/Dashboard admin page                                                                                                                        |
 | Deployment            | **Long-running Node container/runtime**  | Hosts the Next.js frontend, API routes, outbox dispatcher, PostgreSQL listener, and SSE endpoint | The implemented realtime path holds long-lived process and client connections that ordinary serverless request functions cannot guarantee | Local development uses Docker Compose; production needs a production build, managed PostgreSQL, TLS termination, and persistent runtime |
 
@@ -738,7 +752,9 @@ Step by step:
       persistent SSE support, and a readiness probe against `/api/health`.
 - [ ] **TLS/reverse proxy configured** with streaming/buffering settings
       appropriate for SSE and the correct public `APP_ORIGIN`.
-- [ ] **Cloudinary account configured**, API key/secret/cloud name added as environment variables.
+- [ ] **Persistent Product media storage configured and backed up** at
+      `MEDIA_LOCAL_ROOT`, with the public media origin/path matching the
+      deployed application.
 - [ ] **Environment variables set** in root `.env` for local Compose and in the
       production platform’s secret manager; never bake secrets into images.
 - [ ] **JWT secret** generated as a strong random value, never reused from a dev/example value in production.

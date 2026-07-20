@@ -43,6 +43,11 @@ database container
   │
   ▼
 db_data named volume
+
+ecommerce container
+  │ /app/uploads
+  ▼
+media_uploads named volume
 ```
 
 `db` is the Compose DNS name used by containers. `localhost` inside the app
@@ -99,6 +104,7 @@ by same-origin mutation protection.
 | `./ecommerce:/app` | Makes host source changes available to `next dev` |
 | `ecommerce_node_modules:/app/node_modules` | Keeps Linux/container dependencies out of the host bind mount |
 | `ecommerce_next:/app/.next` | Keeps Next.js build/cache output container-managed |
+| `media_uploads:/app/uploads` | Persists validated Product image binaries across app recreation and rebuilds |
 
 Because `node_modules` is a named volume, changing `package.json` or
 `package-lock.json` may require rebuilding/recreating the app container.
@@ -144,6 +150,9 @@ Important groups:
 - Rate limiting: `RATE_LIMIT_*`
 - Display configuration: `APP_CURRENCY`, `APP_LOCALE`, their
   `NEXT_PUBLIC_*` equivalents, and `APP_VERSION`
+- Product media: `MEDIA_STORAGE_DRIVER`, `MEDIA_LOCAL_ROOT`,
+  `MEDIA_PUBLIC_PATH`, `MEDIA_PUBLIC_BASE_URL`, file/pixel/count limits,
+  allowed MIME types, and the upload rate limit
 
 Secrets must stay in `.env` or a deployment secret manager and must never be
 committed or copied into the image.
@@ -184,9 +193,9 @@ Stops/removes containers and the network but retains named volumes.
 docker compose down -v
 ```
 
-Also deletes `db_data`, `ecommerce_node_modules`, and `ecommerce_next`. This is
-a destructive database reset and must not be used when development data needs
-to be preserved.
+Also deletes `db_data`, `ecommerce_node_modules`, `ecommerce_next`, and
+`media_uploads`. This destroys the development database and uploaded Product
+images and must not be used when data needs to be preserved.
 
 Recreating only the app container does not modify the PostgreSQL volume:
 
@@ -209,6 +218,8 @@ A production deployment requires:
 6. A readiness probe against `/api/health`.
 7. Persistent runtime support for PostgreSQL `LISTEN/NOTIFY`, the outbox
    dispatcher, and authenticated SSE.
+8. Persistent storage mounted at `MEDIA_LOCAL_ROOT`, backed up consistently
+   with PostgreSQL, or a future object-storage adapter.
 
 The current realtime design is not suitable for ordinary short-lived
 serverless request functions.

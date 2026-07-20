@@ -282,7 +282,11 @@ deleted” rather than a broken link.
 └───────────────────────────────┘
 ```
 
-Fields: Name (required), Description, Price (required), Category (required dropdown, single-select), Images (upload, via Cloudinary per architecture doc). Save persists changes; Cancel discards.
+Fields: Name (required), Description, Price (required), Category (required
+dropdown, single-select), and Product images. The image manager previews
+selected JPEG/PNG/WebP files, shows existing images, supports primary
+selection, alt text, ordering, and removal, and uploads through authenticated
+local-media endpoints. Save persists changes; Cancel discards unsaved files.
 
 ### Manage Variants
 

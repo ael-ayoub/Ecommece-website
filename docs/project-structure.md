@@ -184,10 +184,14 @@ src/lib/
 ├── errors.ts             # Custom error classes (NotFoundError, ValidationError, ForbiddenError...)
 ├── api-client.ts          # Client-side fetch wrapper — attaches auth header, parses JSON, normalizes errors
 ├── realtime/               # PostgreSQL listener, outbox dispatcher, and notification helpers
-├── cloudinary.ts            # Cloudinary SDK init + upload/delete wrappers
 ├── format.ts                 # Currency, date formatting shared by admin and client UI
 └── calculations.ts             # Cart/order total math (shared so client-side preview and server-side total never drift)
 ```
+
+The sibling `src/media/` directory owns the Product-media storage contract,
+local filesystem adapter, environment parsing, storage-key safety, and raster
+validation. Product services call the media application service rather than
+Node filesystem APIs.
 
 **Why this structure:** everything here is a _utility a service or a component reaches for_, never a thing that owns business rules on its own. `db.ts` is the one and only place `new PrismaClient()` is called — every other file imports the singleton from here, which is what prevents the classic Next.js dev-mode "too many database connections" bug. `calculations.ts` deserves particular emphasis: order total math is computed in exactly one function, imported both by the cart-preview UI and by the order-placement service, so the number the client sees before checkout and the number the server actually charges can never silently diverge.
 
@@ -302,7 +306,10 @@ public/
 └── favicons/         # favicon.ico
 ```
 
-Anything here is served byte-for-byte with no build step — it exists for genuinely static assets, not product images (those are Cloudinary URLs per architecture.md, deliberately kept out of the repo and out of `public/` since they're user-generated and would bloat the deployment).
+Anything here is served byte-for-byte with no build step — it exists for
+genuinely static assets, not Product uploads. Runtime Product images live in
+the `media_uploads` volume and are served through the controlled `/media/*`
+route.
 
 ### 2.11 `tests/`
 

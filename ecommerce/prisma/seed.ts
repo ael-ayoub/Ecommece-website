@@ -68,7 +68,7 @@ async function upsertSeedProduct(seed: SeedProduct) {
             description: seed.description,
             basePrice: seed.basePrice,
             productType: seed.productType,
-            images: seed.images,
+            legacyImageUrls: seed.images,
             isActive: true,
           },
         })
@@ -79,7 +79,7 @@ async function upsertSeedProduct(seed: SeedProduct) {
             description: seed.description,
             basePrice: seed.basePrice,
             productType: seed.productType,
-            images: seed.images,
+            legacyImageUrls: seed.images,
             isActive: true,
           },
         });

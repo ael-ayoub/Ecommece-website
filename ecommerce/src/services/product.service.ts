@@ -17,6 +17,11 @@ import {
 } from "@/domain/product";
 import { recordOptionTemplateUsage } from "@/services/option-template.service";
 import { logger } from "@/lib/logger";
+import {
+  deleteStoredProductImages,
+  selectDisplayImage,
+  toProductImageResponse,
+} from "@/services/product-image.service";
 
 const DEFAULT_PAGE_SIZE = 12;
 
@@ -43,12 +48,27 @@ const productInclude = {
       },
     },
   },
+  images: {
+    orderBy: { position: "asc" as const },
+  },
 } as const;
 
 function withDerivedInventory<
   T extends {
     basePrice: Prisma.Decimal;
     isActive: boolean;
+    legacyImageUrls: string[];
+    images: {
+      id: number;
+      storageKey: string;
+      altText: string | null;
+      position: number;
+      isPrimary: boolean;
+      mimeType: string;
+      sizeBytes: number;
+      width: number;
+      height: number;
+    }[];
     variants: {
       isActive: boolean;
       stockQuantity: number;
@@ -73,8 +93,22 @@ function withDerivedInventory<
       : totalStock > 0
         ? "AVAILABLE"
         : "OUT_OF_STOCK";
+  const { images: storedImages, legacyImageUrls, ...productData } = product;
+  const imageRecords = storedImages.map(toProductImageResponse);
+  const displayImage = selectDisplayImage(imageRecords);
+  const imageUrls =
+    imageRecords.length > 0
+      ? [
+          ...(displayImage ? [displayImage.url] : []),
+          ...imageRecords
+            .filter((image) => image.id !== displayImage?.id)
+            .map((image) => image.url),
+        ]
+      : legacyImageUrls;
   return {
-    ...product,
+    ...productData,
+    images: imageUrls,
+    imageRecords,
     totalStock,
     skuCount: product.variants.length,
     availability,
@@ -163,7 +197,7 @@ export async function createProduct(
             description: input.description,
             basePrice: input.basePrice.toFixed(2),
             categoryId: input.categoryId,
-            images: input.images,
+            legacyImageUrls: input.images,
             isActive: input.isActive,
             showExactStock: input.showExactStock,
             productType: ProductType.SIMPLE,
@@ -228,7 +262,7 @@ export async function createProduct(
           description: input.description,
           basePrice: input.basePrice.toFixed(2),
           categoryId: input.categoryId,
-          images: input.images,
+          legacyImageUrls: input.images,
           isActive: input.isActive,
           showExactStock: input.showExactStock,
           productType: ProductType.CONFIGURABLE,
@@ -331,7 +365,7 @@ export async function createProduct(
 export async function updateProduct(id: number, input: ProductUpdateInput) {
   await getProductById(id, { includeInactive: true });
 
-  return db.product.update({
+  const product = await db.product.update({
     where: { id },
     data: {
       ...(input.name !== undefined ? { name: input.name } : {}),
@@ -344,7 +378,7 @@ export async function updateProduct(id: number, input: ProductUpdateInput) {
       ...(input.categoryId !== undefined
         ? { categoryId: input.categoryId }
         : {}),
-      ...(input.images !== undefined ? { images: input.images } : {}),
+      ...(input.images !== undefined ? { legacyImageUrls: input.images } : {}),
       ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
       ...(input.showExactStock !== undefined
         ? { showExactStock: input.showExactStock }
@@ -352,6 +386,7 @@ export async function updateProduct(id: number, input: ProductUpdateInput) {
     },
     include: productInclude,
   });
+  return withDerivedInventory(product);
 }
 
 export async function unpublishProduct(id: number) {
@@ -380,7 +415,7 @@ export async function publishProduct(id: number) {
  * Historical order relations become null and immutable snapshots remain.
  */
 export async function permanentlyDeleteProduct(id: number) {
-  return db.$transaction(async (tx) => {
+  const storageKeys = await db.$transaction(async (tx) => {
     const products = await tx.$queryRaw<Array<{ id: number }>>`
       SELECT id FROM "Product" WHERE id = ${id} FOR UPDATE
     `;
@@ -424,8 +459,14 @@ export async function permanentlyDeleteProduct(id: number) {
     });
     await tx.productOption.deleteMany({ where: { productId: id } });
     await tx.productVariant.deleteMany({ where: { productId: id } });
+    const images = await tx.productImage.findMany({
+      where: { productId: id },
+      select: { storageKey: true },
+    });
     await tx.product.delete({ where: { id } });
+    return images.map((image) => image.storageKey);
   });
+  await deleteStoredProductImages(id, storageKeys);
 }
 
 export async function addVariant(productId: number, input: VariantCreateInput) {

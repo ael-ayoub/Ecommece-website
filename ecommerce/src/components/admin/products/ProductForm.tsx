@@ -7,12 +7,15 @@ import { apiFetch } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FieldError } from "@/components/ui/field-error";
+import { ProductImageManager } from "@/components/admin/products/ProductImageManager";
 import { combinationKey, effectivePrice } from "@/domain/product";
 import { MAX_SKU_COMBINATIONS } from "@/domain/option-template";
-import type { CategoryDto, ProductDto } from "@/types/product";
+import type { CategoryDto, ProductDto, ProductImageDto } from "@/types/product";
 
 interface Props {
   product?: ProductDto;
+  mediaLimits: { maxFileSizeBytes: number; maxImages: number };
+  initialNotice?: string;
 }
 
 interface TemplateDto {
@@ -54,7 +57,7 @@ function skuSuggestion(
   return (value || `SKU-${sequence + 1}`).slice(0, 64);
 }
 
-export function ProductForm({ product }: Props) {
+export function ProductForm({ product, mediaLimits, initialNotice }: Props) {
   const router = useRouter();
   const isEdit = Boolean(product);
   const [name, setName] = useState(product?.name ?? "");
@@ -90,6 +93,10 @@ export function ProductForm({ product }: Props) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [productImages, setProductImages] = useState<ProductImageDto[]>(
+    product?.imageRecords ?? [],
+  );
+  const [pendingImageFiles, setPendingImageFiles] = useState<File[]>([]);
 
   const { data: categoriesData } = useQuery({
     queryKey: ["categories"],
@@ -291,6 +298,7 @@ export function ProductForm({ product }: Props) {
     setFormError(null);
     if (!validate()) return;
     setSubmitting(true);
+    let savedProductId: number | undefined;
     try {
       const common = {
         name,
@@ -301,49 +309,86 @@ export function ProductForm({ product }: Props) {
         showExactStock,
       };
       if (isEdit) {
-        await apiFetch(`/api/products/${product!.id}`, {
-          method: "PUT",
-          body: JSON.stringify(common),
-        });
+        const response = await apiFetch<{ product: ProductDto }>(
+          `/api/products/${product!.id}`,
+          {
+            method: "PUT",
+            body: JSON.stringify(common),
+          },
+        );
+        savedProductId = response.product.id;
       } else if (productType === "SIMPLE") {
-        await apiFetch("/api/products", {
-          method: "POST",
-          body: JSON.stringify({
-            ...common,
-            productType,
-            sku: {
-              code: simpleSku,
-              stockQuantity: Number(simpleStock),
-              isActive: simpleEnabled,
-            },
-          }),
-        });
+        const response = await apiFetch<{ product: ProductDto }>(
+          "/api/products",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              ...common,
+              productType,
+              sku: {
+                code: simpleSku,
+                stockQuantity: Number(simpleStock),
+                isActive: simpleEnabled,
+              },
+            }),
+          },
+        );
+        savedProductId = response.product.id;
       } else {
-        await apiFetch("/api/products", {
-          method: "POST",
-          body: JSON.stringify({
-            ...common,
-            productType,
-            options: productOptions,
-            sourceTemplateIds: options
-              .map((option) => option.sourceTemplateId)
-              .filter((id): id is number => Boolean(id)),
-            variants: variants.map((variant) => ({
-              selection: variant.selection,
-              label: variant.label,
-              sku: variant.sku,
-              stockQuantity: variant.stockQuantity,
-              priceOverride: variant.priceOverride
-                ? Number(variant.priceOverride)
-                : null,
-              isActive: variant.isActive,
-            })),
-          }),
-        });
+        const response = await apiFetch<{ product: ProductDto }>(
+          "/api/products",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              ...common,
+              productType,
+              options: productOptions,
+              sourceTemplateIds: options
+                .map((option) => option.sourceTemplateId)
+                .filter((id): id is number => Boolean(id)),
+              variants: variants.map((variant) => ({
+                selection: variant.selection,
+                label: variant.label,
+                sku: variant.sku,
+                stockQuantity: variant.stockQuantity,
+                priceOverride: variant.priceOverride
+                  ? Number(variant.priceOverride)
+                  : null,
+                isActive: variant.isActive,
+              })),
+            }),
+          },
+        );
+        savedProductId = response.product.id;
+      }
+
+      if (pendingImageFiles.length > 0 && savedProductId) {
+        const formData = new FormData();
+        pendingImageFiles.forEach((file) => formData.append("files", file));
+        const upload = await fetch(
+          `/api/admin/products/${savedProductId}/images`,
+          {
+            method: "POST",
+            body: formData,
+            credentials: "include",
+          },
+        );
+        const result = await upload.json().catch(() => null);
+        if (!upload.ok) {
+          throw new Error(
+            result?.error ??
+              "The Product was saved, but its images could not be uploaded.",
+          );
+        }
       }
       router.push("/admin/products");
       router.refresh();
     } catch (error) {
+      if (!isEdit && savedProductId) {
+        router.push(`/admin/products/${savedProductId}?imageUpload=failed`);
+        router.refresh();
+        return;
+      }
       setFormError(
         error instanceof Error ? error.message : "Failed to save Product.",
       );
@@ -357,6 +402,14 @@ export function ProductForm({ product }: Props) {
       {formError && (
         <p className="rounded bg-red-50 p-3 text-sm text-red-700">
           {formError}
+        </p>
+      )}
+      {initialNotice && (
+        <p
+          role="status"
+          className="rounded bg-amber-50 p-3 text-sm text-amber-800"
+        >
+          {initialNotice}
         </p>
       )}
 
@@ -820,6 +873,17 @@ export function ProductForm({ product }: Props) {
           </section>
         </>
       )}
+
+      <ProductImageManager
+        productId={product?.id}
+        images={productImages}
+        setImages={setProductImages}
+        pendingFiles={pendingImageFiles}
+        setPendingFiles={setPendingImageFiles}
+        maxFileSizeBytes={mediaLimits.maxFileSizeBytes}
+        maxImages={mediaLimits.maxImages}
+        disabled={submitting}
+      />
 
       <label className="flex items-center gap-2 text-sm">
         <input

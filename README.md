@@ -27,7 +27,8 @@ Docker Compose runs two long-lived containers:
 
 The app source is bind-mounted from `./ecommerce` to `/app`. Separate named
 volumes retain container-managed `node_modules` and `.next` data. PostgreSQL
-data is retained in the `db_data` named volume.
+data is retained in `db_data`; uploaded Product images are retained separately
+in the `media_uploads` named volume.
 
 At app startup, the container runs:
 
@@ -53,6 +54,8 @@ readiness through `http://127.0.0.1:8080/api/health` inside the app container.
    - `JWT_SECRET`
    - `ADMIN_EMAIL` and `ADMIN_PASSWORD`
    - `APP_ORIGIN=http://localhost:3000`
+   - the `MEDIA_*` local-storage values (the checked-in defaults work with
+     Docker Compose)
 
    Keep the PostgreSQL values and `DATABASE_URL` credentials synchronized.
    Never commit `.env`.
@@ -77,6 +80,20 @@ readiness through `http://127.0.0.1:8080/api/health` inside the app container.
 
    - Storefront: <http://localhost:3000>
    - Health/readiness: <http://localhost:3000/api/health>
+   - Uploaded media: `http://localhost:3000/media/<storage-key>`
+
+## Product image storage
+
+Admins can attach ordered JPEG, PNG, or WebP images to Products. Files are
+validated and written beneath `/app/uploads` in the app container, backed by
+the persistent `media_uploads` named volume. PostgreSQL stores only metadata
+and provider-independent storage keys. Do not place runtime uploads in the
+source tree or copy them into the application image.
+
+Back up `media_uploads` together with PostgreSQL: the database metadata and
+binary volume are a single logical dataset. `docker compose down` and app
+container recreation preserve both. `docker compose down -v` and `make fclean`
+delete uploaded media.
 
 ## Daily commands
 

@@ -40,6 +40,18 @@ export interface ProductOptionDto {
   values: { id: number; value: string; position: number }[];
 }
 
+export interface ProductImageDto {
+  id: number;
+  url: string;
+  altText: string | null;
+  position: number;
+  isPrimary: boolean;
+  mimeType: string;
+  sizeBytes: number;
+  width: number;
+  height: number;
+}
+
 export interface ProductDto {
   id: number;
   categoryId: number;
@@ -49,6 +61,7 @@ export interface ProductDto {
   basePrice: Money;
   productType: "SIMPLE" | "CONFIGURABLE";
   images: string[];
+  imageRecords: ProductImageDto[];
   isActive: boolean;
   showExactStock: boolean;
   variants: ProductVariantDto[];

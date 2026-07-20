@@ -142,6 +142,19 @@ export const productUpdateSchema = productBaseSchema.partial().extend({
 });
 export type ProductUpdateInput = z.infer<typeof productUpdateSchema>;
 
+export const productImageUpdateSchema = z
+  .object({
+    altText: z.string().trim().max(300).nullable().optional(),
+    isPrimary: z.boolean().optional(),
+  })
+  .refine((input) => Object.keys(input).length > 0, {
+    message: "Provide at least one image change.",
+  });
+
+export const productImageReorderSchema = z.object({
+  imageIds: z.array(z.coerce.number().int().positive()).max(100),
+});
+
 export const variantCreateSchema = z.object({
   sku: skuCodeSchema,
   variantLabel: z.string().trim().min(1, "Variant label is required"),

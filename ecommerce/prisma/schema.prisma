@@ -97,26 +97,48 @@ model Category {
 // architecture.md §2.3 — shared descriptive data; stock/price live on variants.
 
 model Product {
-  id             Int         @id @default(autoincrement())
-  categoryId     Int
-  category       Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  name           String
-  description    String
-  basePrice      Decimal     @db.Decimal(10, 2)
-  productType    ProductType
-  images         String[]
-  isActive       Boolean     @default(true)
-  showExactStock Boolean     @default(false)
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  id              Int         @id @default(autoincrement())
+  categoryId      Int
+  category        Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  name            String
+  description     String
+  basePrice       Decimal     @db.Decimal(10, 2)
+  productType     ProductType
+  legacyImageUrls String[]    @map("images")
+  isActive        Boolean     @default(true)
+  showExactStock  Boolean     @default(false)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
   variants   ProductVariant[]
   options    ProductOption[]
+  images     ProductImage[]
   orderItems OrderItem[]
 
   @@index([categoryId])
   @@index([isActive])
   @@index([name])
+}
+
+model ProductImage {
+  id           Int      @id @default(autoincrement())
+  productId    Int
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  storageKey   String   @unique
+  originalName String?
+  mimeType     String
+  sizeBytes    Int
+  width        Int
+  height       Int
+  altText      String?
+  position     Int      @default(0)
+  isPrimary    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([productId, position])
+  @@index([productId])
+  @@index([productId, isPrimary])
 }
 
 // --- ProductVariant ----------------------------------------------------------
