@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import type { ProductDto } from "@/types/product";
 import { formatCurrency } from "@/lib/format";
-import { ProductImage } from "@/components/products/ProductImage";
+import { FeaturedProduct3D } from "@/components/storefront/FeaturedProduct3D";
 
 const benefits = [
   {
@@ -36,8 +36,10 @@ const benefits = [
 
 export function HomeHero({
   featuredProduct,
+  modelAvailable,
 }: {
   featuredProduct?: ProductDto;
+  modelAvailable: boolean;
 }) {
   const image = featuredProduct?.images[0];
 
@@ -73,26 +75,19 @@ export function HomeHero({
         <div className="client-hero-product-frame">
           <span className="client-hero-frame-line" aria-hidden="true" />
           {featuredProduct ? (
-            <Link
-              href={`/products/${featuredProduct.id}`}
-              className="client-hero-product-link"
-              aria-label={`View featured Product ${featuredProduct.name}`}
-            >
+            <div className="client-hero-product-link">
               <div className="client-hero-product-media">
-                {image ? (
-                  <ProductImage
-                    src={image}
-                    alt={featuredProduct.name}
-                    className="client-hero-product-image"
-                  />
-                ) : (
-                  <div className="client-hero-product-fallback">
-                    <Boxes aria-hidden="true" />
-                    <span>Image unavailable</span>
-                  </div>
-                )}
+                <FeaturedProduct3D
+                  image={image}
+                  productName={featuredProduct.name}
+                  modelAvailable={modelAvailable}
+                />
               </div>
-              <div className="client-hero-product-details">
+              <Link
+                href={`/products/${featuredProduct.id}`}
+                className="client-hero-product-details"
+                aria-label={`View featured Product ${featuredProduct.name}`}
+              >
                 <div>
                   <p>{featuredProduct.category.name}</p>
                   <h2>{featuredProduct.name}</h2>
@@ -102,8 +97,8 @@ export function HomeHero({
                     ? `From ${formatCurrency(featuredProduct.minPrice)}`
                     : formatCurrency(featuredProduct.minPrice)}
                 </strong>
-              </div>
-            </Link>
+              </Link>
+            </div>
           ) : (
             <div className="client-hero-product-empty">
               <Boxes aria-hidden="true" />

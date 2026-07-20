@@ -443,7 +443,7 @@ body {
 
 .client-hero-primary:focus-visible,
 .client-hero-secondary:focus-visible,
-.client-hero-product-link:focus-visible,
+.client-hero-product-details:focus-visible,
 .client-category-card:focus-visible {
   outline: 2px solid #f3c977;
   outline-offset: 3px;
@@ -491,11 +491,84 @@ body {
 }
 
 .client-hero-product-media {
+  position: relative;
   display: grid;
   aspect-ratio: 1 / 0.82;
   overflow: hidden;
   place-items: center;
   background: radial-gradient(circle at 50% 42%, #ffffff, #e8e4dc 72%), #f1efe9;
+}
+
+.client-featured-3d {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 16rem;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: pan-y;
+}
+
+.client-featured-3d:active {
+  cursor: grabbing;
+}
+
+.client-featured-3d-fallback {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  background: radial-gradient(circle at 50% 42%, #ffffff, #e8e4dc 72%), #f1efe9;
+}
+
+.client-featured-3d-fallback.is-loading::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 25%,
+    rgb(255 255 255 / 0.5) 45%,
+    transparent 65%
+  );
+  animation: client-featured-shimmer 1.5s ease-in-out infinite;
+  content: "";
+  transform: translateX(-100%);
+}
+
+.client-featured-3d-loading {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.65rem;
+  border-radius: 999px;
+  background: rgb(17 24 39 / 0.82);
+  padding: 0.3rem 0.6rem;
+  color: #f9fafb;
+  font-size: 0.65rem;
+  font-weight: 650;
+}
+
+.client-featured-3d-canvas {
+  position: absolute !important;
+  z-index: 2;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  outline: none;
+  touch-action: pan-y !important;
+}
+
+.client-featured-3d canvas:focus-visible {
+  outline: 2px solid #f3c977;
+  outline-offset: -3px;
+}
+
+@keyframes client-featured-shimmer {
+  to {
+    transform: translateX(100%);
+  }
 }
 
 .client-hero-product-image {

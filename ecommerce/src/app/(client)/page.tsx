@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { ArrowRight } from "lucide-react";
 import { listCategories } from "@/services/category.service";
 import { listProducts } from "@/services/product.service";
@@ -16,11 +18,17 @@ export default async function Home() {
   ]);
   const featuredProduct =
     products.find((product) => product.images.length > 0) ?? products[0];
+  const modelAvailable = existsSync(
+    path.join(process.cwd(), "public/models/featured-product.glb"),
+  );
 
   return (
     <main className="client-full-bleed client-home">
       <StorefrontContainer className="client-home-hero-wrap">
-        <HomeHero featuredProduct={featuredProduct} />
+        <HomeHero
+          featuredProduct={featuredProduct}
+          modelAvailable={modelAvailable}
+        />
       </StorefrontContainer>
 
       <StorefrontContainer>
