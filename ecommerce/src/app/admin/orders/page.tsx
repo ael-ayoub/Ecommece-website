@@ -9,6 +9,7 @@ import { OrderStatusSelect } from "@/components/admin/orders/OrderStatusSelect";
 import { formatCurrency } from "@/lib/format";
 import { ORDER_STATUSES, ORDER_STATUS_LABELS } from "@/constants/order-status";
 import type { OrderDto, OrderStatusValue } from "@/types/order";
+import { AdminSelect } from "@/components/admin/AdminSelect";
 
 export default function AdminOrdersPage() {
   const router = useRouter();
@@ -54,19 +55,19 @@ export default function AdminOrdersPage() {
 
       <div className="admin-toolbar">
         <div>
-          <label className="mb-1 block text-xs font-medium">Status</label>
-          <select
+          <AdminSelect
+            label="Status"
+            ariaLabel="Filter orders by status"
             value={status}
-            onChange={(e) => setStatus(e.target.value as OrderStatusValue | "")}
-            className="rounded-md border border-gray-300 px-2 py-1.5"
-          >
-            <option value="">All</option>
-            {ORDER_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {ORDER_STATUS_LABELS[s]}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => setStatus(value as OrderStatusValue | "")}
+            options={[
+              { value: "", label: "All" },
+              ...ORDER_STATUSES.map((orderStatus) => ({
+                value: orderStatus,
+                label: ORDER_STATUS_LABELS[orderStatus],
+              })),
+            ]}
+          />
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium">

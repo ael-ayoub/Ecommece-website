@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FieldError } from "@/components/ui/field-error";
 import { ProductImageManager } from "@/components/admin/products/ProductImageManager";
+import { AdminSelect } from "@/components/admin/AdminSelect";
 import { combinationKey, effectivePrice } from "@/domain/product";
 import { MAX_SKU_COMBINATIONS } from "@/domain/option-template";
 import type { CategoryDto, ProductDto, ProductImageDto } from "@/types/product";
@@ -425,18 +426,21 @@ export function ProductForm({ product, mediaLimits, initialNotice }: Props) {
         </label>
         <label className="text-sm">
           Category *
-          <select
+          <AdminSelect
+            ariaLabel="Product Category"
             value={categoryId}
-            onChange={(event) => setCategoryId(event.target.value)}
-            className="mt-1 block w-full rounded-md border px-3 py-2"
-          >
-            <option value="">Select a Category</option>
-            {categoriesData?.categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
+            onChange={setCategoryId}
+            loading={!categoriesData}
+            error={Boolean(errors.categoryId)}
+            options={[
+              { value: "", label: "Select a Category" },
+              ...(categoriesData?.categories ?? []).map((category) => ({
+                value: String(category.id),
+                label: category.name,
+              })),
+            ]}
+            className="mt-1"
+          />
           <FieldError message={errors.categoryId} />
         </label>
         <label className="text-sm">
@@ -649,12 +653,13 @@ export function ProductForm({ product, mediaLimits, initialNotice }: Props) {
                 {options.map((option) => (
                   <label key={option.key} className="text-sm">
                     {option.name || "Option"} *
-                    <select
+                    <AdminSelect
+                      ariaLabel={option.name || "Product option"}
                       value={selection[option.name] ?? ""}
-                      onChange={(event) => {
+                      onChange={(value) => {
                         const next = {
                           ...selection,
-                          [option.name]: event.target.value,
+                          [option.name]: value,
                         };
                         setSelection(next);
                         setCombinationLabel(
@@ -667,13 +672,15 @@ export function ProductForm({ product, mediaLimits, initialNotice }: Props) {
                           skuSuggestion(name, next, variants.length),
                         );
                       }}
-                      className="mt-1 block w-full rounded border px-2 py-2"
-                    >
-                      <option value="">Select</option>
-                      {option.selectedValues.map((value) => (
-                        <option key={value}>{value}</option>
-                      ))}
-                    </select>
+                      options={[
+                        { value: "", label: "Select" },
+                        ...option.selectedValues.map((value) => ({
+                          value,
+                          label: value,
+                        })),
+                      ]}
+                      className="mt-1"
+                    />
                   </label>
                 ))}
               </div>

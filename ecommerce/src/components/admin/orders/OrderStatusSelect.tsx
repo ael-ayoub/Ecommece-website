@@ -4,12 +4,12 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-client";
 import {
-  ORDER_STATUS_COLORS,
   ORDER_STATUS_LABELS,
   STOCK_RESTORING_STATUSES,
   getAdminOrderTransitions,
 } from "@/constants/order-status";
 import type { OrderStatusValue } from "@/types/order";
+import { AdminSelect } from "@/components/admin/AdminSelect";
 
 interface Props {
   orderId: number;
@@ -58,21 +58,21 @@ export function OrderStatusSelect({ orderId, status }: Props) {
 
   return (
     <div className="inline-block text-left">
-      <select
-        aria-label={`Status for order ${orderId}`}
+      <AdminSelect
+        ariaLabel={`Status for order ${orderId}`}
         value={status}
         disabled={updating}
-        onClick={(e) => e.stopPropagation()}
-        onChange={(e) => handleChange(e.target.value as OrderStatusValue)}
-        className={`rounded px-2 py-1 text-xs font-medium disabled:opacity-50 ${ORDER_STATUS_COLORS[status]}`}
-      >
-        <option value={status}>{ORDER_STATUS_LABELS[status]}</option>
-        {getAdminOrderTransitions(status).map((s) => (
-          <option key={s} value={s}>
-            {ORDER_STATUS_LABELS[s]}
-          </option>
-        ))}
-      </select>
+        loading={updating}
+        onChange={(value) => handleChange(value as OrderStatusValue)}
+        options={[
+          { value: status, label: ORDER_STATUS_LABELS[status] },
+          ...getAdminOrderTransitions(status).map((nextStatus) => ({
+            value: nextStatus,
+            label: ORDER_STATUS_LABELS[nextStatus],
+          })),
+        ]}
+        className="text-xs font-medium"
+      />
       {error && (
         <p role="alert" className="mt-1 text-xs text-red-600">
           {error}

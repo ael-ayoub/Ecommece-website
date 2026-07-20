@@ -30,6 +30,12 @@ export interface ListProductsParams {
   pageSize?: number;
   categorySlug?: string;
   search?: string;
+  productType?: ProductType;
+  publicationStatus?: "published" | "unpublished";
+  availability?: "available" | "out_of_stock" | "unavailable";
+  minPrice?: number;
+  maxPrice?: number;
+  sort?: "newest" | "oldest" | "name" | "price" | "status";
   /** Admin views need archived products too; public views never do. */
   includeInactive?: boolean;
 }
@@ -123,14 +129,62 @@ function withDerivedInventory<
 
 export async function listProducts(params: ListProductsParams) {
   const page = Math.max(1, params.page ?? 1);
-  const pageSize = params.pageSize ?? DEFAULT_PAGE_SIZE;
+  const pageSize = Math.min(
+    50,
+    Math.max(5, params.pageSize ?? DEFAULT_PAGE_SIZE),
+  );
+  const numericSearch = params.search?.trim().match(/^\d+$/)
+    ? Number(params.search)
+    : null;
 
   const where: Prisma.ProductWhereInput = {
-    ...(params.includeInactive ? {} : { isActive: true }),
+    ...(params.includeInactive
+      ? params.publicationStatus
+        ? { isActive: params.publicationStatus === "published" }
+        : {}
+      : { isActive: true }),
     ...(params.categorySlug ? { category: { slug: params.categorySlug } } : {}),
+    ...(params.productType ? { productType: params.productType } : {}),
+    ...(params.minPrice !== undefined || params.maxPrice !== undefined
+      ? {
+          basePrice: {
+            ...(params.minPrice !== undefined ? { gte: params.minPrice } : {}),
+            ...(params.maxPrice !== undefined ? { lte: params.maxPrice } : {}),
+          },
+        }
+      : {}),
+    ...(params.availability === "available"
+      ? {
+          isActive: true,
+          variants: { some: { isActive: true, stockQuantity: { gt: 0 } } },
+        }
+      : params.availability === "out_of_stock"
+        ? {
+            isActive: true,
+            variants: {
+              some: { isActive: true },
+              none: { isActive: true, stockQuantity: { gt: 0 } },
+            },
+          }
+        : params.availability === "unavailable"
+          ? {}
+          : {}),
+    ...(params.availability === "unavailable"
+      ? {
+          AND: [
+            {
+              OR: [
+                { isActive: false },
+                { variants: { none: { isActive: true } } },
+              ],
+            },
+          ],
+        }
+      : {}),
     ...(params.search
       ? {
           OR: [
+            ...(numericSearch ? [{ id: numericSearch }] : []),
             { name: { contains: params.search, mode: "insensitive" as const } },
             {
               description: {
@@ -143,16 +197,36 @@ export async function listProducts(params: ListProductsParams) {
                 name: { contains: params.search, mode: "insensitive" as const },
               },
             },
+            {
+              variants: {
+                some: {
+                  sku: {
+                    contains: params.search,
+                    mode: "insensitive" as const,
+                  },
+                },
+              },
+            },
           ],
         }
       : {}),
   };
+  const orderBy: Prisma.ProductOrderByWithRelationInput[] =
+    params.sort === "oldest"
+      ? [{ createdAt: "asc" }, { id: "asc" }]
+      : params.sort === "name"
+        ? [{ name: "asc" }, { id: "asc" }]
+        : params.sort === "price"
+          ? [{ basePrice: "asc" }, { id: "asc" }]
+          : params.sort === "status"
+            ? [{ isActive: "desc" }, { name: "asc" }]
+            : [{ createdAt: "desc" }, { id: "desc" }];
 
   const [products, total] = await Promise.all([
     db.product.findMany({
       where,
       include: productInclude,
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      orderBy,
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
