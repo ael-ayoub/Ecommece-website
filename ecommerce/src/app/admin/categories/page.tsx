@@ -1,15 +1,32 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { FormEvent, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { FolderTree, Pencil, Plus, Trash2 } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import type { CategoryDto } from "@/types/product";
+import {
+  AdminActionMenu,
+  AdminAlert,
+  AdminButton,
+  AdminCard,
+  AdminConfirmDialog,
+  AdminEmptyState,
+  AdminInput,
+  AdminLoadingState,
+  AdminPageHeader,
+  AdminTable,
+} from "@/components/admin/AdminUI";
+
+type PendingAction =
+  | { type: "create" }
+  | { type: "update"; id: number }
+  | { type: "delete"; id: number }
+  | null;
 
 export default function AdminCategoriesPage() {
   const queryClient = useQueryClient();
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["categories"],
     queryFn: () => apiFetch<{ categories: CategoryDto[] }>("/api/categories"),
   });
@@ -17,176 +34,269 @@ export default function AdminCategoriesPage() {
   const [name, setName] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<CategoryDto | null>(null);
+  const [pending, setPending] = useState<PendingAction>(null);
   const [error, setError] = useState<string | null>(null);
 
   function invalidate() {
-    queryClient.invalidateQueries({ queryKey: ["categories"] });
+    return queryClient.invalidateQueries({ queryKey: ["categories"] });
   }
 
-  async function handleCreate(e: FormEvent) {
-    e.preventDefault();
+  async function handleCreate(event: FormEvent) {
+    event.preventDefault();
     setError(null);
     if (!name.trim()) {
       setError("Category name is required.");
       return;
     }
+    setPending({ type: "create" });
     try {
       await apiFetch("/api/categories", {
         method: "POST",
         body: JSON.stringify({ name }),
       });
       setName("");
-      invalidate();
-    } catch (err) {
+      await invalidate();
+    } catch (reason) {
       setError(
-        err instanceof Error ? err.message : "Failed to create category.",
+        reason instanceof Error ? reason.message : "Failed to create category.",
       );
+    } finally {
+      setPending(null);
     }
   }
 
   async function handleUpdate(id: number) {
     setError(null);
+    if (!editingName.trim()) {
+      setError("Category name is required.");
+      return;
+    }
+    setPending({ type: "update", id });
     try {
       await apiFetch(`/api/categories/${id}`, {
         method: "PUT",
         body: JSON.stringify({ name: editingName }),
       });
       setEditingId(null);
-      invalidate();
-    } catch (err) {
+      await invalidate();
+    } catch (reason) {
       setError(
-        err instanceof Error ? err.message : "Failed to update category.",
+        reason instanceof Error ? reason.message : "Failed to update category.",
       );
+    } finally {
+      setPending(null);
     }
   }
 
   async function handleDelete(category: CategoryDto) {
-    const count = category._count?.products ?? 0;
-    if (
-      !confirm(
-        `Permanently delete "${category.name}"?\n\nThis cannot be undone. Categories containing Products cannot be deleted.\n\nCurrent Products: ${count}`,
-      )
-    )
-      return;
     setError(null);
+    setPending({ type: "delete", id: category.id });
     try {
       await apiFetch(`/api/categories/${category.id}`, { method: "DELETE" });
-      invalidate();
-    } catch (err) {
+      setDeleteTarget(null);
+      await invalidate();
+    } catch (reason) {
       setError(
-        err instanceof Error ? err.message : "Failed to delete category.",
+        reason instanceof Error ? reason.message : "Failed to delete category.",
       );
+    } finally {
+      setPending(null);
     }
   }
 
-  return (
-    <div className="max-w-4xl">
-      <div className="admin-page-heading">
-        <div>
-          <p className="admin-eyebrow">Catalog structure</p>
-          <h1>Categories</h1>
-          <p>
-            Organize Products without changing their inventory or lifecycle.
-          </p>
-        </div>
-      </div>
+  const categories = data?.categories ?? [];
+  const creating = pending?.type === "create";
 
-      {error && (
-        <p
-          role="alert"
-          className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700"
+  return (
+    <div className="admin-page">
+      <AdminPageHeader
+        eyebrow="Catalog structure"
+        title="Categories"
+        description="Organize Products without changing their inventory or lifecycle."
+      />
+
+      {error ? (
+        <AdminAlert
+          action={
+            <AdminButton onClick={() => setError(null)}>Dismiss</AdminButton>
+          }
         >
           {error}
-        </p>
-      )}
+        </AdminAlert>
+      ) : null}
 
-      {isLoading ? (
-        <p>Loading…</p>
-      ) : (
-        <div className="admin-table-scroll">
-          <table className="w-full text-sm">
+      <AdminCard>
+        {isLoading ? (
+          <AdminLoadingState label="Loading Categories" />
+        ) : isError ? (
+          <AdminEmptyState
+            icon={<FolderTree aria-hidden="true" />}
+            title="Categories could not be loaded"
+            description="Try the request again. No Category data was changed."
+            action={<AdminButton onClick={() => refetch()}>Retry</AdminButton>}
+          />
+        ) : categories.length === 0 ? (
+          <AdminEmptyState
+            icon={<FolderTree aria-hidden="true" />}
+            title="No Categories yet"
+            description="Create a Category below to begin organizing the Product catalog."
+          />
+        ) : (
+          <AdminTable label="Categories">
             <thead>
-              <tr className="border-b border-gray-200 text-left text-gray-500">
-                <th scope="col" className="py-2">
-                  Name
-                </th>
+              <tr>
+                <th scope="col">Category name</th>
                 <th scope="col">Products</th>
-                <th scope="col">
+                <th scope="col" className="admin-table-actions-heading">
                   <span className="sr-only">Actions</span>
                 </th>
               </tr>
             </thead>
             <tbody>
-              {data?.categories.map((c) => (
-                <tr key={c.id} className="border-b border-gray-100">
-                  <td className="py-2">
-                    {editingId === c.id ? (
-                      <Input
-                        value={editingName}
-                        onChange={(e) => setEditingName(e.target.value)}
-                        className="w-40"
-                      />
-                    ) : (
-                      c.name
-                    )}
-                  </td>
-                  <td>{c._count?.products ?? 0}</td>
-                  <td className="space-x-3 py-2 text-right">
-                    {editingId === c.id ? (
-                      <>
-                        <button
-                          onClick={() => handleUpdate(c.id)}
-                          className="underline"
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={() => setEditingId(null)}
-                          className="underline"
-                        >
-                          Cancel
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => {
-                            setEditingId(c.id);
-                            setEditingName(c.name);
+              {categories.map((category) => {
+                const count = category._count?.products ?? 0;
+                const editing = editingId === category.id;
+                const updating =
+                  pending?.type === "update" && pending.id === category.id;
+                return (
+                  <tr key={category.id} className={editing ? "is-editing" : ""}>
+                    <td>
+                      {editing ? (
+                        <AdminInput
+                          label="Category name"
+                          className="admin-table-edit-field"
+                          value={editingName}
+                          maxLength={100}
+                          autoFocus
+                          disabled={updating}
+                          onChange={(event) =>
+                            setEditingName(event.target.value)
+                          }
+                          onKeyDown={(event) => {
+                            if (event.key === "Escape") setEditingId(null);
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              handleUpdate(category.id);
+                            }
                           }}
-                          className="underline"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(c)}
-                          className="text-red-600 underline"
-                        >
-                          Delete
-                        </button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                        />
+                      ) : (
+                        <span className="admin-table-primary">
+                          {category.name}
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      <span className="admin-count">
+                        {count} Product{count === 1 ? "" : "s"}
+                      </span>
+                    </td>
+                    <td className="admin-table-actions">
+                      {editing ? (
+                        <div className="admin-row-actions">
+                          <AdminButton
+                            variant="secondary"
+                            disabled={updating}
+                            onClick={() => setEditingId(null)}
+                          >
+                            Cancel
+                          </AdminButton>
+                          <AdminButton
+                            disabled={updating || !editingName.trim()}
+                            onClick={() => handleUpdate(category.id)}
+                          >
+                            {updating ? "Saving…" : "Save"}
+                          </AdminButton>
+                        </div>
+                      ) : (
+                        <AdminActionMenu
+                          label={`Actions for ${category.name}`}
+                          items={[
+                            {
+                              label: "Edit Category",
+                              icon: <Pencil aria-hidden="true" />,
+                              onSelect: () => {
+                                setEditingId(category.id);
+                                setEditingName(category.name);
+                                setError(null);
+                              },
+                            },
+                            {
+                              label: "Delete Category",
+                              icon: <Trash2 aria-hidden="true" />,
+                              tone: "danger",
+                              disabled: count > 0,
+                              title:
+                                count > 0
+                                  ? "Move Products before deleting this Category."
+                                  : undefined,
+                              onSelect: () => setDeleteTarget(category),
+                            },
+                          ]}
+                        />
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
-          </table>
-        </div>
-      )}
+          </AdminTable>
+        )}
+      </AdminCard>
 
-      <form onSubmit={handleCreate} className="admin-create-row">
-        <div className="min-w-0 flex-1">
-          <label className="mb-1 block text-xs font-medium">
-            New category name
-          </label>
-          <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full"
-          />
+      <AdminCard className="admin-form-card">
+        <div className="admin-card-heading">
+          <div>
+            <h2>Create Category</h2>
+            <p>Add a reusable catalog grouping for Products.</p>
+          </div>
         </div>
-        <Button type="submit">Create Category</Button>
-      </form>
+        <form className="admin-inline-form" onSubmit={handleCreate}>
+          <AdminInput
+            label="New Category name"
+            value={name}
+            maxLength={100}
+            disabled={creating}
+            error={
+              !name.trim() && error === "Category name is required."
+                ? error
+                : undefined
+            }
+            onChange={(event) => {
+              setName(event.target.value);
+              if (error === "Category name is required.") setError(null);
+            }}
+          />
+          <AdminButton type="submit" disabled={creating || !name.trim()}>
+            <Plus aria-hidden="true" />
+            {creating ? "Creating…" : "Create Category"}
+          </AdminButton>
+        </form>
+      </AdminCard>
+
+      <AdminConfirmDialog
+        open={Boolean(deleteTarget)}
+        title={`Delete “${deleteTarget?.name ?? ""}”?`}
+        description={
+          <>
+            <p>
+              This permanently deletes the Category and cannot be undone.
+              Categories containing Products remain protected.
+            </p>
+            <p>
+              Current Products:{" "}
+              <strong>{deleteTarget?._count?.products ?? 0}</strong>
+            </p>
+          </>
+        }
+        confirmLabel="Delete Category"
+        busy={pending?.type === "delete" && pending.id === deleteTarget?.id}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          if (deleteTarget) handleDelete(deleteTarget);
+        }}
+      />
     </div>
   );
 }

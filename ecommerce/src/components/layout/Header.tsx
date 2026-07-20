@@ -38,7 +38,11 @@ function HeaderSearch({
   }
 
   return (
-    <form role="search" onSubmit={submit} className="relative w-full">
+    <form
+      role="search"
+      onSubmit={submit}
+      className="client-header-search relative w-full"
+    >
       <label htmlFor={id} className="sr-only">
         Search Products
       </label>
@@ -200,12 +204,12 @@ export function Header({ categories }: { categories: CategoryDto[] }) {
   ) : null;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-[var(--client-border-subtle)] bg-[var(--client-surface)]/95 backdrop-blur">
+    <header className="client-site-header sticky top-0 z-40 border-b border-[var(--client-border-subtle)] bg-[var(--client-surface)]/95 backdrop-blur">
       <StorefrontContainer>
-        <div className="flex h-16 items-center gap-3 lg:h-18">
+        <div className="client-header-inner flex h-16 items-center gap-3 lg:h-18">
           <Link
             href="/"
-            className="flex shrink-0 items-center gap-2 rounded-md font-bold tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--client-focus-ring)] focus-visible:ring-offset-2"
+            className="client-brand flex shrink-0 items-center gap-2 rounded-md font-bold tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--client-focus-ring)] focus-visible:ring-offset-2"
           >
             <span className="grid size-9 place-items-center rounded-lg bg-[var(--client-text-primary)] text-white shadow-sm">
               <ShoppingBag aria-hidden="true" className="size-5" />
@@ -270,15 +274,16 @@ export function Header({ categories }: { categories: CategoryDto[] }) {
                     <ChevronDown aria-hidden="true" className="size-4" />
                   </button>
                   {accountOpen && (
-                    <div
-                      className="absolute right-0 top-full mt-2 min-w-52 rounded-xl border border-[var(--client-border-subtle)] bg-[var(--client-surface-elevated)] p-2 shadow-[var(--client-shadow-lg)]"
-                    >
+                    <div className="absolute right-0 top-full mt-2 min-w-52 rounded-xl border border-[var(--client-border-subtle)] bg-[var(--client-surface-elevated)] p-2 shadow-[var(--client-shadow-lg)]">
                       <p className="px-3 pb-2 pt-1 text-xs text-[var(--client-text-secondary)]">
                         Signed in as {user.email}
                       </p>
                       {accountLinks}
                       {logoutError && (
-                        <p role="alert" className="px-3 py-2 text-xs text-red-700">
+                        <p
+                          role="alert"
+                          className="px-3 py-2 text-xs text-red-700"
+                        >
                           Could not log out. Please try again.
                         </p>
                       )}
