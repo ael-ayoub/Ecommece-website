@@ -660,6 +660,30 @@ export default function AdminProductsPage() {
         <>
           <div className="admin-products-table-wrap">
             <table className="admin-products-table">
+              <colgroup>
+                <col className="admin-col-checkbox" />
+                <col className="admin-col-product" />
+                {visibleColumns.has("type") && (
+                  <col className="admin-col-type" />
+                )}
+                {visibleColumns.has("category") && (
+                  <col className="admin-col-category" />
+                )}
+                {visibleColumns.has("price") && (
+                  <col className="admin-col-price" />
+                )}
+                {visibleColumns.has("inventory") && (
+                  <col className="admin-col-inventory" />
+                )}
+                {visibleColumns.has("availability") && (
+                  <col className="admin-col-availability" />
+                )}
+                {visibleColumns.has("status") && (
+                  <col className="admin-col-status" />
+                )}
+                <col className="admin-col-actions" />
+                <col className="admin-col-chevron" />
+              </colgroup>
               <thead>
                 <tr>
                   <th>
@@ -725,7 +749,7 @@ export default function AdminProductsPage() {
                           }
                         />
                       </td>
-                      <td>
+                      <td className="admin-product-cell">
                         <div className="admin-product-identity">
                           <ProductThumbnail product={product} />
                           <div>
@@ -871,7 +895,7 @@ export default function AdminProductsPage() {
                         key={`${product.id}-editor`}
                         className="admin-editor-row"
                       >
-                        <td colSpan={11}>
+                        <td colSpan={visibleColumns.size + 4}>
                           <AdminProductInlineEditor
                             product={product}
                             categories={categories}
