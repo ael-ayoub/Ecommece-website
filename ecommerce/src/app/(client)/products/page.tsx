@@ -1,5 +1,6 @@
 import { listProducts } from "@/services/product.service";
 import { listCategories } from "@/services/category.service";
+import Link from "next/link";
 import { ProductCard } from "@/components/products/ProductCard";
 import { CategoryFilter } from "@/components/products/CategoryFilter";
 import { SearchBar } from "@/components/products/SearchBar";
@@ -11,9 +12,11 @@ interface Props {
 }
 
 export default async function ProductsPage({ searchParams }: Props) {
-  const page = searchParams.page ? Number(searchParams.page) : 1;
+  const requestedPage = Number(searchParams.page ?? 1);
+  const page =
+    Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
 
-  const [{ products, totalPages }, categories] = await Promise.all([
+  const [{ products, total, totalPages }, categories] = await Promise.all([
     listProducts({
       page,
       categorySlug: searchParams.category,
@@ -25,6 +28,7 @@ export default async function ProductsPage({ searchParams }: Props) {
   const activeCategory = categories.find(
     (c) => c.slug === searchParams.category,
   );
+  const hasActiveCriteria = Boolean(searchParams.category || searchParams.q);
 
   function buildHref(p: number) {
     const params = new URLSearchParams();
@@ -36,49 +40,89 @@ export default async function ProductsPage({ searchParams }: Props) {
   }
 
   return (
-    <div>
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold">
-          {activeCategory ? activeCategory.name : "All products"}
-        </h1>
-        <SearchBar />
-      </div>
-
-      {searchParams.q && (
-        <p className="mb-4 text-sm text-gray-600">
-          Results for: &quot;{searchParams.q}&quot;
+    <main className="pb-12 text-stone-950">
+      <header className="mb-8 max-w-2xl">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
+          Shop the collection
         </p>
-      )}
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+          {activeCategory ? activeCategory.name : "All Products"}
+        </h1>
+        <p className="mt-3 text-base leading-7 text-stone-600">
+          Browse our available products and find the option that fits you.
+        </p>
+      </header>
 
-      <div className="grid grid-cols-1 gap-8 sm:grid-cols-[200px_1fr]">
+      <section aria-label="Product search and filters" className="space-y-5">
+        <SearchBar />
         <CategoryFilter
           categories={categories}
           activeSlug={searchParams.category}
+          searchQuery={searchParams.q}
         />
+      </section>
 
+      <div className="mt-8 flex flex-wrap items-end justify-between gap-3 border-b border-stone-200 pb-4">
         <div>
-          {products.length === 0 ? (
-            <p className="py-16 text-center text-gray-500">
-              {searchParams.q
-                ? "No products match your search."
-                : "No products in this category yet."}
-            </p>
-          ) : (
-            <>
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {products.map((product: ProductDto) => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
-              </div>
-              <Pagination
-                page={page}
-                totalPages={totalPages}
-                buildHref={buildHref}
-              />
-            </>
-          )}
+          <h2 className="text-lg font-semibold">
+            {activeCategory?.name ?? "Available products"}
+          </h2>
+          <p className="mt-1 text-sm text-stone-500" aria-live="polite">
+            {total} {total === 1 ? "product" : "products"}
+            {searchParams.q ? ` matching “${searchParams.q}”` : ""}
+          </p>
         </div>
+        {hasActiveCriteria && (
+          <Link
+            href="/products"
+            className="inline-flex min-h-11 items-center rounded-md px-3 text-sm font-semibold text-stone-700 underline decoration-stone-300 underline-offset-4 transition-colors hover:text-stone-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-900 focus-visible:ring-offset-2 motion-reduce:transition-none"
+          >
+            Clear all filters
+          </Link>
+        )}
       </div>
-    </div>
+
+      {products.length === 0 ? (
+        <section className="mx-auto flex max-w-xl flex-col items-center py-20 text-center">
+          <div
+            aria-hidden="true"
+            className="mb-5 grid size-14 place-items-center rounded-full bg-stone-100 text-2xl font-medium text-stone-500"
+          >
+            0
+          </div>
+          <h2 className="text-xl font-semibold">
+            {hasActiveCriteria
+              ? "No products match your selection"
+              : "No products are available yet"}
+          </h2>
+          <p className="mt-2 max-w-md text-sm leading-6 text-stone-600">
+            {hasActiveCriteria
+              ? "Try a different search or category, or clear the current filters to browse the full catalog."
+              : "Please check back soon. New products will appear here when they become available."}
+          </p>
+          {hasActiveCriteria && (
+            <Link
+              href="/products"
+              className="mt-6 inline-flex min-h-11 items-center justify-center rounded-md bg-stone-900 px-5 text-sm font-semibold text-white transition-colors hover:bg-stone-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-900 focus-visible:ring-offset-2 motion-reduce:transition-none"
+            >
+              View all products
+            </Link>
+          )}
+        </section>
+      ) : (
+        <>
+          <div className="mt-6 grid grid-cols-1 gap-x-5 gap-y-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {products.map((product: ProductDto) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            buildHref={buildHref}
+          />
+        </>
+      )}
+    </main>
   );
 }
