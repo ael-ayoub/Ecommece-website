@@ -5,12 +5,12 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, PackageSearch, RefreshCw } from "lucide-react";
 import { AccountNavigation } from "@/components/account/AccountNavigation";
 import { ClientOrderStatus } from "@/components/orders/ClientOrderStatus";
-import { apiFetch } from "@/lib/api-client";
+import { ApiClientError, apiFetch } from "@/lib/api-client";
 import { formatCurrency } from "@/lib/format";
 import type { OrderDto } from "@/types/order";
 
 export default function MyOrdersPage() {
-  const { data, isLoading, isError, refetch, isFetching } = useQuery({
+  const { data, error, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["my-orders"],
     queryFn: () => apiFetch<{ orders: OrderDto[] }>("/api/orders"),
   });
@@ -32,22 +32,35 @@ export default function MyOrdersPage() {
           className="mt-8 rounded-2xl border border-red-200 bg-red-50 p-6"
         >
           <h2 className="font-bold text-red-900">
-            We couldn&apos;t load your orders
+            {error instanceof ApiClientError && error.status === 401
+              ? "Your session has expired"
+              : "We couldn’t load your orders"}
           </h2>
           <p className="mt-2 text-sm text-red-800">
-            Your session may have expired. Log in again or retry this request.
+            {error instanceof ApiClientError && error.status === 401
+              ? "Log in again to securely return to My Orders."
+              : "Check your connection and retry this request."}
           </p>
-          <button
-            onClick={() => refetch()}
-            disabled={isFetching}
-            className="client-button-secondary mt-5"
-          >
-            <RefreshCw
-              aria-hidden="true"
-              className={`size-4 ${isFetching ? "animate-spin motion-reduce:animate-none" : ""}`}
-            />
-            Retry
-          </button>
+          {error instanceof ApiClientError && error.status === 401 ? (
+            <Link
+              href="/login?redirect=%2Forders"
+              className="client-button-primary mt-5"
+            >
+              Log in
+            </Link>
+          ) : (
+            <button
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className="client-button-secondary mt-5"
+            >
+              <RefreshCw
+                aria-hidden="true"
+                className={`size-4 ${isFetching ? "animate-spin motion-reduce:animate-none" : ""}`}
+              />
+              Retry
+            </button>
+          )}
         </section>
       ) : !data?.orders.length ? (
         <section className="mt-8 rounded-2xl border border-[var(--client-border-subtle)] bg-[var(--client-surface-elevated)] p-8 text-center">

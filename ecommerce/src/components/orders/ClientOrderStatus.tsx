@@ -1,5 +1,13 @@
 import { ORDER_STATUS_LABELS } from "@/constants/order-status";
 import type { OrderStatusValue } from "@/types/order";
+import {
+  Ban,
+  CheckCircle2,
+  Clock3,
+  PackageCheck,
+  RotateCcw,
+  Truck,
+} from "lucide-react";
 
 const tones: Record<OrderStatusValue, string> = {
   PENDING: "border-amber-200 bg-amber-50 text-amber-800",
@@ -10,11 +18,22 @@ const tones: Record<OrderStatusValue, string> = {
   CANCELLED: "border-gray-200 bg-gray-100 text-gray-700",
 };
 
+const icons = {
+  PENDING: Clock3,
+  CONFIRMED: CheckCircle2,
+  SHIPPED: Truck,
+  DELIVERED: PackageCheck,
+  RETURNED: RotateCcw,
+  CANCELLED: Ban,
+} satisfies Record<OrderStatusValue, typeof Clock3>;
+
 export function ClientOrderStatus({ status }: { status: OrderStatusValue }) {
+  const Icon = icons[status];
   return (
     <span
-      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${tones[status]}`}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${tones[status]}`}
     >
+      <Icon aria-hidden="true" className="size-3.5" />
       {ORDER_STATUS_LABELS[status]}
     </span>
   );

@@ -3,16 +3,23 @@
 import Link from "next/link";
 import { FormEvent, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { Eye, EyeOff, LoaderCircle, UserPlus } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import type { AuthUser } from "@/types/auth";
+import {
+  safeReturnPath,
+  validateRegisterFields,
+  type RegisterFieldErrors,
+} from "@/domain/auth-navigation";
 
 const inputClass =
   "mt-2 min-h-12 w-full rounded-xl border border-[var(--client-border-subtle)] bg-[var(--client-surface)] px-3 text-base outline-none focus:border-[var(--client-text-primary)] focus:ring-2 focus:ring-[var(--client-focus-ring)]/20";
 
 export function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const locked = useRef(false);
   const [form, setForm] = useState({
@@ -23,21 +30,18 @@ export function RegisterForm() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<RegisterFieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (locked.current) return;
     setError(null);
-    if (
-      !form.name.trim() ||
-      !/^\S+@\S+\.\S+$/.test(form.email.trim()) ||
-      form.phone.trim().length < 6 ||
-      form.password.length < 8
-    ) {
-      setError(
-        "Check each field. Your password must contain at least 8 characters.",
-      );
+    const nextErrors = validateRegisterFields(form);
+    setFieldErrors(nextErrors);
+    const firstError = Object.keys(nextErrors)[0];
+    if (firstError) {
+      document.getElementById(`register-${firstError}`)?.focus();
       return;
     }
     locked.current = true;
@@ -48,7 +52,8 @@ export function RegisterForm() {
         body: JSON.stringify(form),
       });
       queryClient.setQueryData(["auth", "me"], { user: data.user });
-      router.push(data.user.role === "ADMIN" ? "/admin/products" : "/");
+      const fallback = data.user.role === "ADMIN" ? "/admin/products" : "/";
+      router.push(safeReturnPath(searchParams.get("redirect"), fallback));
       router.refresh();
     } catch {
       setError(
@@ -86,6 +91,7 @@ export function RegisterForm() {
           value={form.name}
           onChange={set("name")}
           autoComplete="name"
+          error={fieldErrors.name}
         />
         <Field
           id="register-email"
@@ -94,6 +100,7 @@ export function RegisterForm() {
           onChange={set("email")}
           autoComplete="email"
           type="email"
+          error={fieldErrors.email}
         />
         <Field
           id="register-phone"
@@ -102,6 +109,7 @@ export function RegisterForm() {
           onChange={set("phone")}
           autoComplete="tel"
           type="tel"
+          error={fieldErrors.phone}
         />
         <div>
           <label htmlFor="register-password" className="text-sm font-semibold">
@@ -118,6 +126,7 @@ export function RegisterForm() {
               required
               minLength={8}
               aria-describedby="register-password-hint"
+              aria-invalid={!!fieldErrors.password}
             />
             <button
               type="button"
@@ -137,7 +146,7 @@ export function RegisterForm() {
             id="register-password-hint"
             className="mt-2 text-xs text-[var(--client-text-secondary)]"
           >
-            Use at least 8 characters.
+            {fieldErrors.password ?? "Use at least 8 characters."}
           </p>
         </div>
         <button
@@ -159,12 +168,15 @@ export function RegisterForm() {
       <p className="mt-6 text-center text-sm text-[var(--client-text-secondary)]">
         Already have an account?{" "}
         <Link
-          href="/login"
+          href={`/login${searchParams.get("redirect") ? `?redirect=${encodeURIComponent(safeReturnPath(searchParams.get("redirect"), "/"))}` : ""}`}
           className="font-semibold text-[var(--client-text-primary)] underline underline-offset-4"
         >
           Log in
         </Link>
       </p>
+      <Link href="/products" className="client-text-link mt-3 w-full justify-center text-sm">
+        Continue shopping
+      </Link>
     </section>
   );
 }
@@ -176,6 +188,7 @@ function Field({
   onChange,
   type = "text",
   autoComplete,
+  error,
 }: {
   id: string;
   label: string;
@@ -183,6 +196,7 @@ function Field({
   onChange: (value: string) => void;
   type?: string;
   autoComplete: string;
+  error?: string;
 }) {
   return (
     <div>
@@ -197,7 +211,14 @@ function Field({
         onChange={(event) => onChange(event.target.value)}
         className={inputClass}
         required
+        aria-invalid={!!error}
+        aria-describedby={error ? `${id}-error` : undefined}
       />
+      {error && (
+        <p id={`${id}-error`} role="alert" className="mt-2 text-sm text-red-700">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

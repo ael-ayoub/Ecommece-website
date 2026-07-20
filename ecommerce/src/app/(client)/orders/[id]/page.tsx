@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Banknote, Check, RefreshCw, ShoppingBag } from "lucide-react";
-import { apiFetch } from "@/lib/api-client";
+import { ApiClientError, apiFetch } from "@/lib/api-client";
 import { OrderStatusTimeline } from "@/components/orders/OrderStatusTimeline";
 import { OrderItemsTable } from "@/components/orders/OrderItemsTable";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ export default function OrderDetailPage({ params }: Props) {
   const justPlaced = searchParams.get("justPlaced") === "1";
   const queryClient = useQueryClient();
 
-  const { data, isLoading, isError, refetch, isFetching } = useQuery({
+  const { data, error, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["order", orderId],
     queryFn: () => apiFetch<{ order: OrderDto }>(`/api/orders/${orderId}`),
   });
@@ -31,8 +31,11 @@ export default function OrderDetailPage({ params }: Props) {
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const cancelLocked = useRef(false);
 
   async function handleCancel() {
+    if (cancelLocked.current) return;
+    cancelLocked.current = true;
     setCancelError(null);
     setCancelling(true);
     try {
@@ -40,11 +43,10 @@ export default function OrderDetailPage({ params }: Props) {
       queryClient.invalidateQueries({ queryKey: ["order", orderId] });
       queryClient.invalidateQueries({ queryKey: ["my-orders"] });
       setConfirmingCancel(false);
-    } catch (err) {
-      setCancelError(
-        err instanceof Error ? err.message : "Failed to cancel order.",
-      );
+    } catch {
+      setCancelError("We could not cancel this order. Refresh its status and try again.");
     } finally {
+      cancelLocked.current = false;
       setCancelling(false);
     }
   }
@@ -61,7 +63,9 @@ export default function OrderDetailPage({ params }: Props) {
         </div>
       </main>
     );
-  if (isError || !data)
+  if (isError || !data) {
+    const sessionExpired =
+      error instanceof ApiClientError && error.status === 401;
     return (
       <main className="client-container py-10 sm:py-14">
         <AccountNavigation />
@@ -69,30 +73,45 @@ export default function OrderDetailPage({ params }: Props) {
           role="alert"
           className="mt-8 rounded-2xl border border-red-200 bg-red-50 p-6"
         >
-          <h1 className="text-xl font-bold text-red-900">Order unavailable</h1>
+          <h1 className="text-xl font-bold text-red-900">
+            {sessionExpired ? "Your session has expired" : "Order unavailable"}
+          </h1>
           <p className="mt-2 text-sm leading-6 text-red-800">
-            This order does not exist, does not belong to this account, or your
-            session has expired.
+            {sessionExpired
+              ? "Log in again to securely return to this order."
+              : "This order does not exist or does not belong to this account."}
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
-            <button
-              onClick={() => refetch()}
-              disabled={isFetching}
-              className="client-button-secondary"
-            >
-              <RefreshCw
-                aria-hidden="true"
-                className={`size-4 ${isFetching ? "animate-spin motion-reduce:animate-none" : ""}`}
-              />
-              Retry
-            </button>
-            <Link href="/orders" className="client-button-primary">
-              My Orders
-            </Link>
+            {sessionExpired ? (
+              <Link
+                href={`/login?redirect=${encodeURIComponent(`/orders/${orderId}`)}`}
+                className="client-button-primary"
+              >
+                Log in
+              </Link>
+            ) : (
+              <>
+                <button
+                  onClick={() => refetch()}
+                  disabled={isFetching}
+                  className="client-button-secondary"
+                >
+                  <RefreshCw
+                    aria-hidden="true"
+                    className={`size-4 ${isFetching ? "animate-spin motion-reduce:animate-none" : ""}`}
+                  />
+                  Retry
+                </button>
+                <Link href="/orders" className="client-button-primary">
+                  My Orders
+                </Link>
+              </>
+            )}
           </div>
         </section>
       </main>
     );
+  }
 
   const { order } = data;
 
@@ -143,7 +162,11 @@ export default function OrderDetailPage({ params }: Props) {
         </div>
 
         <div className="overflow-x-auto pb-2">
-          <OrderItemsTable items={order.items} total={order.totalAmount} />
+          <OrderItemsTable
+            items={order.items}
+            total={order.totalAmount}
+            clientResponsive
+          />
         </div>
 
         <p className="mt-6 text-sm leading-6 text-[var(--client-text-secondary)]">
@@ -156,6 +179,20 @@ export default function OrderDetailPage({ params }: Props) {
           <Banknote aria-hidden="true" className="size-4" />
           Payment: Cash on Delivery
         </p>
+        <dl className="mt-6 grid gap-3 rounded-xl bg-[var(--client-surface-muted)] p-4 text-sm sm:grid-cols-2">
+          <div>
+            <dt className="font-semibold">Recipient</dt>
+            <dd className="mt-1 break-words text-[var(--client-text-secondary)]">
+              {order.contactName}
+            </dd>
+          </div>
+          <div>
+            <dt className="font-semibold">Contact</dt>
+            <dd className="mt-1 break-words text-[var(--client-text-secondary)]">
+              {order.contactEmail} · {order.contactPhone}
+            </dd>
+          </div>
+        </dl>
 
         {order.status === "PENDING" && (
           <div className="mt-6">

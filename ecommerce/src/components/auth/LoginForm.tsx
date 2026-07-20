@@ -6,7 +6,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { Eye, EyeOff, LoaderCircle, LogIn } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
-import { safeReturnPath } from "@/domain/auth-navigation";
+import {
+  safeReturnPath,
+  validateLoginFields,
+  type LoginFieldErrors,
+} from "@/domain/auth-navigation";
 import type { AuthUser } from "@/types/auth";
 
 const inputClass =
@@ -21,14 +25,18 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<LoginFieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (locked.current) return;
     setError(null);
-    if (!/^\S+@\S+\.\S+$/.test(email.trim()) || !password) {
-      setError("Enter a valid email address and password.");
+    const nextErrors = validateLoginFields(email, password);
+    setFieldErrors(nextErrors);
+    const firstError = Object.keys(nextErrors)[0];
+    if (firstError) {
+      document.getElementById(`login-${firstError}`)?.focus();
       return;
     }
     locked.current = true;
@@ -78,7 +86,14 @@ export function LoginForm() {
             onChange={(event) => setEmail(event.target.value)}
             className={inputClass}
             required
+            aria-invalid={!!fieldErrors.email}
+            aria-describedby={fieldErrors.email ? "login-email-error" : undefined}
           />
+          {fieldErrors.email && (
+            <p id="login-email-error" role="alert" className="mt-2 text-sm text-red-700">
+              {fieldErrors.email}
+            </p>
+          )}
         </div>
         <div>
           <label htmlFor="login-password" className="text-sm font-semibold">
@@ -93,6 +108,10 @@ export function LoginForm() {
               onChange={(event) => setPassword(event.target.value)}
               className={`${inputClass} pr-12`}
               required
+              aria-invalid={!!fieldErrors.password}
+              aria-describedby={
+                fieldErrors.password ? "login-password-error" : undefined
+              }
             />
             <button
               type="button"
@@ -108,6 +127,11 @@ export function LoginForm() {
               )}
             </button>
           </div>
+          {fieldErrors.password && (
+            <p id="login-password-error" role="alert" className="mt-2 text-sm text-red-700">
+              {fieldErrors.password}
+            </p>
+          )}
         </div>
         <button
           type="submit"
@@ -128,7 +152,7 @@ export function LoginForm() {
       <p className="mt-6 text-center text-sm text-[var(--client-text-secondary)]">
         Don&apos;t have an account?{" "}
         <Link
-          href="/register"
+          href={`/register${searchParams.get("redirect") ? `?redirect=${encodeURIComponent(safeReturnPath(searchParams.get("redirect"), "/"))}` : ""}`}
           className="font-semibold text-[var(--client-text-primary)] underline underline-offset-4"
         >
           Create one

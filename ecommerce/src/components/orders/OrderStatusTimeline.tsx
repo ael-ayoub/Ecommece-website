@@ -11,7 +11,7 @@ import type { OrderStatusValue } from "@/types/order";
 export function OrderStatusTimeline({ status }: { status: OrderStatusValue }) {
   if (status === "CANCELLED" || status === "RETURNED") {
     return (
-      <p className="text-sm font-medium text-red-600">
+      <p role="status" className="text-sm font-medium text-red-700">
         This order was {ORDER_STATUS_LABELS[status].toLowerCase()}.
       </p>
     );
@@ -20,11 +20,15 @@ export function OrderStatusTimeline({ status }: { status: OrderStatusValue }) {
   const currentIndex = ORDER_FORWARD_PATH.indexOf(status);
 
   return (
-    <div className="flex items-center">
+    <ol aria-label="Order progress" className="flex min-w-max items-center">
       {ORDER_FORWARD_PATH.map((step, i) => (
-        <div key={step} className="flex items-center">
-          <div className="flex flex-col items-center">
-            <div
+        <li key={step} className="flex items-center">
+          <div
+            className="flex flex-col items-center"
+            aria-current={step === status ? "step" : undefined}
+          >
+            <span
+              aria-hidden="true"
               className={`h-3 w-3 rounded-full border-2 ${
                 i <= currentIndex
                   ? "border-gray-900 bg-gray-900"
@@ -33,6 +37,7 @@ export function OrderStatusTimeline({ status }: { status: OrderStatusValue }) {
             />
             <span className="mt-1 text-xs text-gray-600">
               {ORDER_STATUS_LABELS[step]}
+              {step === status ? " (current)" : ""}
             </span>
           </div>
           {i < ORDER_FORWARD_PATH.length - 1 && (
@@ -40,8 +45,8 @@ export function OrderStatusTimeline({ status }: { status: OrderStatusValue }) {
               className={`mx-1 h-0.5 w-8 ${i < currentIndex ? "bg-gray-900" : "bg-gray-300"}`}
             />
           )}
-        </div>
+        </li>
       ))}
-    </div>
+    </ol>
   );
 }

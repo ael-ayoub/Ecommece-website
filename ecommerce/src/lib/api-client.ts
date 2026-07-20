@@ -1,5 +1,14 @@
-// Thin fetch wrapper for client components: same-origin, JSON in/out,
-// throws with the server's error message so callers can show it directly.
+export class ApiClientError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ApiClientError";
+  }
+}
+
+// Thin fetch wrapper for client components: same-origin, JSON in/out.
 export async function apiFetch<T>(
   url: string,
   options: RequestInit = {},
@@ -13,7 +22,10 @@ export async function apiFetch<T>(
   const data = await res.json().catch(() => null);
 
   if (!res.ok) {
-    throw new Error(data?.error ?? "Something went wrong. Please try again.");
+    throw new ApiClientError(
+      res.status,
+      data?.error ?? "Something went wrong. Please try again.",
+    );
   }
 
   return data as T;

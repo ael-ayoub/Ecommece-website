@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { safeReturnPath } from "../../src/domain/auth-navigation";
+import {
+  safeReturnPath,
+  validateLoginFields,
+  validateRegisterFields,
+} from "../../src/domain/auth-navigation";
 
 test("safe return paths preserve internal destinations", () => {
   assert.equal(
@@ -22,4 +26,29 @@ test("unsafe return paths cannot redirect away from the storefront", () => {
 
 test("missing return paths use the role-aware fallback", () => {
   assert.equal(safeReturnPath(null, "/"), "/");
+});
+
+test("login validation associates errors with invalid fields", () => {
+  assert.deepEqual(validateLoginFields("invalid", ""), {
+    email: "Enter a valid email address.",
+    password: "Enter your password.",
+  });
+  assert.deepEqual(validateLoginFields("client@example.com", "secret"), {});
+});
+
+test("registration validation follows the server field requirements", () => {
+  assert.deepEqual(
+    validateRegisterFields({
+      name: "",
+      email: "invalid",
+      phone: "123",
+      password: "short",
+    }),
+    {
+      name: "Enter your full name.",
+      email: "Enter a valid email address.",
+      phone: "Enter a valid phone number.",
+      password: "Use at least 8 characters.",
+    },
+  );
 });

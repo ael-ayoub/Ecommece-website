@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Mail, Phone, UserRound } from "lucide-react";
 import { AccountNavigation } from "@/components/account/AccountNavigation";
 import { getCurrentUser } from "@/lib/get-current-user";
+import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
   title: "My profile | E-Commerce",
@@ -10,6 +11,7 @@ export const metadata: Metadata = {
 
 export default async function AccountPage() {
   const user = await getCurrentUser();
+  if (!user) redirect("/login?redirect=%2Faccount");
   return (
     <main className="client-container py-10 sm:py-14">
       <AccountNavigation />

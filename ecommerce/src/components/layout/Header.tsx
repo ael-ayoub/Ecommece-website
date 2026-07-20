@@ -91,6 +91,8 @@ export function Header({ categories }: { categories: CategoryDto[] }) {
   const { user, isLoading, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [logoutError, setLogoutError] = useState(false);
+  const logoutLocked = useRef(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const mobilePanelRef = useRef<HTMLElement>(null);
@@ -159,11 +161,20 @@ export function Header({ categories }: { categories: CategoryDto[] }) {
   }, [accountOpen]);
 
   async function handleLogout() {
-    await logout();
-    setAccountOpen(false);
-    setMobileOpen(false);
-    router.push("/");
-    router.refresh();
+    if (logoutLocked.current) return;
+    logoutLocked.current = true;
+    setLogoutError(false);
+    try {
+      await logout();
+      setAccountOpen(false);
+      setMobileOpen(false);
+      router.push("/");
+      router.refresh();
+    } catch {
+      setLogoutError(true);
+    } finally {
+      logoutLocked.current = false;
+    }
   }
 
   const accountLinks = user ? (
@@ -252,7 +263,7 @@ export function Header({ categories }: { categories: CategoryDto[] }) {
                     onClick={() => setAccountOpen((open) => !open)}
                     className="client-header-action"
                     aria-expanded={accountOpen}
-                    aria-haspopup="menu"
+                    aria-haspopup="true"
                   >
                     <UserRound aria-hidden="true" className="size-5" />
                     <span className="max-w-28 truncate">{user.name}</span>
@@ -260,13 +271,17 @@ export function Header({ categories }: { categories: CategoryDto[] }) {
                   </button>
                   {accountOpen && (
                     <div
-                      role="menu"
                       className="absolute right-0 top-full mt-2 min-w-52 rounded-xl border border-[var(--client-border-subtle)] bg-[var(--client-surface-elevated)] p-2 shadow-[var(--client-shadow-lg)]"
                     >
                       <p className="px-3 pb-2 pt-1 text-xs text-[var(--client-text-secondary)]">
                         Signed in as {user.email}
                       </p>
                       {accountLinks}
+                      {logoutError && (
+                        <p role="alert" className="px-3 py-2 text-xs text-red-700">
+                          Could not log out. Please try again.
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -361,6 +376,11 @@ export function Header({ categories }: { categories: CategoryDto[] }) {
                 <div className="flex flex-col">
                   <p className="mb-2 px-3 text-sm font-semibold">{user.name}</p>
                   {accountLinks}
+                  {logoutError && (
+                    <p role="alert" className="px-3 py-2 text-xs text-red-700">
+                      Could not log out. Please try again.
+                    </p>
+                  )}
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3">
