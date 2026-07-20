@@ -1,7 +1,7 @@
 function ProductCardSkeleton() {
   return (
-    <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
-      <div className="aspect-square bg-stone-200" />
+    <div className="overflow-hidden rounded-2xl border border-[var(--client-border-subtle)] bg-[var(--client-surface)]">
+      <div className="aspect-[4/5] bg-stone-200" />
       <div className="space-y-3 p-4">
         <div className="h-3 w-20 rounded bg-stone-200" />
         <div className="h-5 w-4/5 rounded bg-stone-200" />
@@ -17,14 +17,14 @@ export default function ProductsLoading() {
     <main
       aria-label="Loading products"
       aria-busy="true"
-      className="animate-pulse pb-12 text-stone-950 motion-reduce:animate-none"
+      className="animate-pulse pb-12 motion-reduce:animate-none"
     >
       <div className="mb-8 space-y-3">
         <div className="h-3 w-32 rounded bg-stone-200" />
         <div className="h-10 w-56 rounded bg-stone-200" />
         <div className="h-5 w-full max-w-lg rounded bg-stone-200" />
       </div>
-      <div className="h-24 rounded-xl border border-stone-200 bg-stone-100" />
+      <div className="h-24 rounded-2xl border border-[var(--client-border-subtle)] bg-[var(--client-surface-muted)]" />
       <div className="mt-5 flex gap-2 overflow-hidden">
         {[96, 120, 104, 136].map((width) => (
           <div

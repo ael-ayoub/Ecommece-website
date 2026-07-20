@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { Check, Minus, Plus, ShoppingBag } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import { useCart } from "@/hooks/useCart";
 import type { ProductVariantDto } from "@/types/product";
@@ -26,42 +27,70 @@ export function VariantSelector({
   showExactStock,
 }: Props) {
   const { addItem } = useCart();
-  const selectableVariants = variants; // disabled/out-of-stock stay visible but non-selectable
-  const firstSelectable = variants.find(
-    (v) => v.isActive && v.stockQuantity > 0,
+  const firstPurchasable = variants.find(
+    (variant) => variant.isActive && variant.stockQuantity > 0,
   );
   const structured = variants.some(
     (variant) => (variant.optionValues?.length ?? 0) > 0,
   );
   const [selectedId, setSelectedId] = useState<number | null>(
-    productType === "SIMPLE" ? (firstSelectable?.id ?? null) : null,
+    productType === "SIMPLE" ? (firstPurchasable?.id ?? null) : null,
   );
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [quantity, setQuantity] = useState(1);
   const [justAdded, setJustAdded] = useState(false);
+  const addLocked = useRef(false);
 
   const selected = useMemo(
-    () => selectableVariants.find((v) => v.id === selectedId) ?? null,
-    [selectableVariants, selectedId],
+    () => variants.find((variant) => variant.id === selectedId) ?? null,
+    [variants, selectedId],
   );
 
-  const price = selected?.price ?? basePrice;
-  const maxQty = selected?.stockQuantity ?? 0;
   const optionDefinitions = useMemo(() => {
-    const values = new Map<string, Set<string>>();
+    const options = new Map<
+      string,
+      { position: number; values: Set<string> }
+    >();
     for (const variant of variants) {
       for (const link of variant.optionValues ?? []) {
-        const name = link.optionValue.option.name;
-        const current = values.get(name) ?? new Set<string>();
-        current.add(link.optionValue.value);
-        values.set(name, current);
+        const option = link.optionValue.option;
+        const current = options.get(option.name) ?? {
+          position: option.position,
+          values: new Set<string>(),
+        };
+        current.values.add(link.optionValue.value);
+        options.set(option.name, current);
       }
     }
-    return Array.from(values.entries()).map(([name, optionValues]) => ({
-      name,
-      values: Array.from(optionValues),
-    }));
+    return Array.from(options.entries())
+      .map(([name, option]) => ({
+        name,
+        position: option.position,
+        values: Array.from(option.values),
+      }))
+      .sort((a, b) => a.position - b.position);
   }, [variants]);
+
+  const availabilityVariants = useMemo(
+    () =>
+      variants.map((variant) => ({
+        isActive: variant.isActive,
+        stockQuantity: variant.stockQuantity,
+        values: Object.fromEntries(
+          (variant.optionValues ?? []).map(({ optionValue }) => [
+            optionValue.option.name,
+            optionValue.value,
+          ]),
+        ),
+      })),
+    [variants],
+  );
+
+  const effectivePrice = selected?.price ?? basePrice;
+  const maxQuantity = selected?.stockQuantity ?? 0;
+  const allOptionsSelected =
+    optionDefinitions.length > 0 &&
+    optionDefinitions.every((option) => selections[option.name]);
 
   function selectOption(name: string, value: string) {
     const next = { ...selections, [name]: value };
@@ -81,19 +110,28 @@ export function VariantSelector({
     setJustAdded(false);
   }
 
-  function selectVariant(v: ProductVariantDto) {
-    if (!v.isActive || v.stockQuantity === 0) return;
-    setSelectedId(v.id);
+  function selectVariant(variant: ProductVariantDto) {
+    if (!variant.isActive || variant.stockQuantity === 0) return;
+    setSelectedId(variant.id);
     setQuantity(1);
     setJustAdded(false);
   }
 
-  function handleAddToCart() {
-    // Defensive guard mirroring selectVariant's rule — a disabled/out-of-stock
-    // variant can never be `selected` in the first place, but this keeps the
-    // add path itself provably safe even if that invariant ever changes.
-    if (!selected || !selected.isActive || selected.stockQuantity === 0) return;
+  function changeQuantity(value: number) {
+    setQuantity(Math.max(1, Math.min(maxQuantity, Math.trunc(value) || 1)));
+    setJustAdded(false);
+  }
 
+  function handleAddToCart() {
+    if (
+      addLocked.current ||
+      !selected ||
+      !selected.isActive ||
+      selected.stockQuantity === 0
+    ) {
+      return;
+    }
+    addLocked.current = true;
     addItem(
       {
         id: `${productId}:${selected.id}`,
@@ -109,143 +147,197 @@ export function VariantSelector({
       quantity,
     );
     setJustAdded(true);
+    window.requestAnimationFrame(() => {
+      addLocked.current = false;
+    });
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <p className="tabular-nums text-3xl font-bold tracking-tight">
+          {formatCurrency(effectivePrice)}
+        </p>
+        <span
+          className={`inline-flex min-h-8 items-center rounded-full px-3 text-xs font-semibold ${
+            selected
+              ? "bg-green-50 text-[var(--client-success)]"
+              : "bg-[var(--client-surface-muted)] text-[var(--client-text-secondary)]"
+          }`}
+          aria-live="polite"
+        >
+          {selected
+            ? showExactStock
+              ? `${selected.stockQuantity} available`
+              : "Available"
+            : firstPurchasable
+              ? "Choose your options"
+              : "Out of stock"}
+        </span>
+      </div>
+
       {productType === "CONFIGURABLE" && structured && (
-        <div className="space-y-3">
+        <div className="mt-7 space-y-6">
           {optionDefinitions.map((option) => (
-            <div key={option.name}>
-              <p className="mb-1 text-sm font-medium">{option.name}</p>
-              <div className="flex flex-wrap gap-2">
+            <fieldset key={option.name}>
+              <legend className="text-sm font-semibold">
+                {option.name}
+                {selections[option.name] && (
+                  <span className="ml-2 font-normal text-[var(--client-text-secondary)]">
+                    {selections[option.name]}
+                  </span>
+                )}
+              </legend>
+              <div className="mt-2 flex flex-wrap gap-2">
                 {option.values.map((value) => {
                   const availability = optionValueAvailability(
-                    variants.map((variant) => ({
-                      isActive: variant.isActive,
-                      stockQuantity: variant.stockQuantity,
-                      values: Object.fromEntries(
-                        (variant.optionValues ?? []).map(({ optionValue }) => [
-                          optionValue.option.name,
-                          optionValue.value,
-                        ]),
-                      ),
-                    })),
+                    availabilityVariants,
                     selections,
                     option.name,
                     value,
                   );
-                  const possible = availability === "AVAILABLE";
+                  const available = availability === "AVAILABLE";
+                  const active = selections[option.name] === value;
+                  const stateLabel =
+                    availability === "OUT_OF_STOCK"
+                      ? "out of stock"
+                      : "unavailable";
                   return (
                     <button
                       key={value}
                       type="button"
-                      disabled={!possible}
-                      title={
-                        !possible
-                          ? availability === "OUT_OF_STOCK"
-                            ? "Out of stock"
-                            : "Unavailable"
-                          : undefined
-                      }
+                      disabled={!available}
+                      aria-pressed={active}
+                      aria-label={`${option.name}: ${value}${available ? "" : `, ${stateLabel}`}`}
                       onClick={() => selectOption(option.name, value)}
-                      className={`rounded border px-3 py-1 text-sm ${
-                        selections[option.name] === value
-                          ? "border-gray-900 bg-gray-900 text-white"
-                          : "border-gray-300"
-                      } disabled:cursor-not-allowed disabled:opacity-40`}
+                      className={`min-h-11 rounded-xl border px-4 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--client-focus-ring)] focus-visible:ring-offset-2 motion-reduce:transition-none ${
+                        active
+                          ? "border-[var(--client-text-primary)] bg-[var(--client-text-primary)] text-white"
+                          : available
+                            ? "border-[var(--client-border-subtle)] bg-[var(--client-surface)] hover:border-[var(--client-border-strong)]"
+                            : "cursor-not-allowed border-[var(--client-border-subtle)] bg-[var(--client-surface-muted)] text-[var(--client-text-secondary)] line-through opacity-60"
+                      }`}
                     >
                       {value}
                     </button>
                   );
                 })}
               </div>
-            </div>
+            </fieldset>
           ))}
         </div>
       )}
+
       {productType === "CONFIGURABLE" && !structured && (
-        <div>
-          <p className="mb-2 text-sm font-medium">Variant</p>
-          <div className="flex flex-wrap gap-2">
-            {variants.map((v) => {
-              const disabled = !v.isActive || v.stockQuantity === 0;
-              const active = v.id === selectedId;
+        <fieldset className="mt-7">
+          <legend className="text-sm font-semibold">Choose a Variant</legend>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {variants.map((variant) => {
+              const disabled = !variant.isActive || variant.stockQuantity === 0;
+              const active = variant.id === selectedId;
               return (
                 <button
-                  key={v.id}
+                  key={variant.id}
                   type="button"
                   disabled={disabled}
-                  onClick={() => selectVariant(v)}
-                  title={
-                    !v.isActive
-                      ? "Unavailable"
-                      : v.stockQuantity === 0
-                        ? "Out of stock"
-                        : undefined
-                  }
-                  className={`rounded-md border px-3 py-1.5 text-sm ${
+                  aria-pressed={active}
+                  onClick={() => selectVariant(variant)}
+                  className={`min-h-11 rounded-xl border px-4 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--client-focus-ring)] focus-visible:ring-offset-2 ${
                     disabled
-                      ? "cursor-not-allowed border-gray-200 text-gray-300 line-through"
+                      ? "cursor-not-allowed border-[var(--client-border-subtle)] bg-[var(--client-surface-muted)] text-[var(--client-text-secondary)] line-through opacity-60"
                       : active
-                        ? "border-gray-900 bg-gray-900 text-white"
-                        : "border-gray-300 hover:border-gray-500"
+                        ? "border-[var(--client-text-primary)] bg-[var(--client-text-primary)] text-white"
+                        : "border-[var(--client-border-subtle)] hover:border-[var(--client-border-strong)]"
                   }`}
                 >
-                  {v.variantLabel}
+                  {variant.variantLabel}
                 </button>
               );
             })}
           </div>
-          {selected && (
-            <p className="mt-2 text-sm text-gray-600">
-              {selected.variantLabel}
-              {showExactStock
-                ? ` — ${selected.stockQuantity} left`
-                : " — Available"}
-            </p>
-          )}
+        </fieldset>
+      )}
+
+      {selected && (
+        <div className="mt-6 rounded-xl bg-[var(--client-surface-muted)] p-4 text-sm">
+          <p className="font-semibold">{selected.variantLabel}</p>
+          <p className="mt-1 text-xs text-[var(--client-text-secondary)]">
+            SKU {selected.sku}
+          </p>
         </div>
       )}
 
-      <p className="text-2xl font-bold">{formatCurrency(price)}</p>
-
       {selected ? (
         <>
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium">Quantity:</span>
-            <button
-              type="button"
-              className="h-8 w-8 rounded border border-gray-300"
-              onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-            >
-              −
-            </button>
-            <span>{quantity}</span>
-            <button
-              type="button"
-              className="h-8 w-8 rounded border border-gray-300 disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={quantity >= maxQty}
-              onClick={() => setQuantity((q) => Math.min(maxQty, q + 1))}
-            >
-              +
-            </button>
+          <div className="mt-6">
+            <label htmlFor="product-quantity" className="text-sm font-semibold">
+              Quantity
+            </label>
+            <div className="mt-2 inline-flex items-center rounded-xl border border-[var(--client-border-subtle)] bg-[var(--client-surface)]">
+              <button
+                type="button"
+                aria-label="Decrease quantity"
+                disabled={quantity <= 1}
+                onClick={() => changeQuantity(quantity - 1)}
+                className="client-icon-button rounded-r-none disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Minus aria-hidden="true" className="size-4" />
+              </button>
+              <input
+                id="product-quantity"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={maxQuantity}
+                value={quantity}
+                onChange={(event) => changeQuantity(Number(event.target.value))}
+                className="h-11 w-14 border-x border-[var(--client-border-subtle)] bg-transparent text-center text-base font-semibold tabular-nums outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--client-focus-ring)]"
+              />
+              <button
+                type="button"
+                aria-label="Increase quantity"
+                disabled={quantity >= maxQuantity}
+                onClick={() => changeQuantity(quantity + 1)}
+                className="client-icon-button rounded-l-none disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Plus aria-hidden="true" className="size-4" />
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-[var(--client-text-secondary)]">
+              Maximum {maxQuantity} for this SKU.
+            </p>
           </div>
+
           <button
             type="button"
             onClick={handleAddToCart}
-            className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
+            className="client-button-primary mt-6 w-full"
           >
-            {justAdded ? "Added ✓" : "Add to Cart"}
+            {justAdded ? (
+              <Check aria-hidden="true" className="size-4" />
+            ) : (
+              <ShoppingBag aria-hidden="true" className="size-4" />
+            )}
+            {justAdded ? "Added to Cart" : "Add to Cart"}
           </button>
+          <p
+            className="mt-3 min-h-5 text-center text-sm text-[var(--client-success)]"
+            aria-live="polite"
+          >
+            {justAdded ? `${quantity} added. Your cart has been updated.` : ""}
+          </p>
         </>
       ) : (
-        <p className="text-sm font-medium text-red-600">
-          {structured &&
-          Object.keys(selections).length < optionDefinitions.length
-            ? "Select all options"
-            : "Out of stock or unavailable"}
-        </p>
+        <div
+          role="status"
+          className="mt-6 rounded-xl border border-[var(--client-border-subtle)] bg-[var(--client-surface-muted)] p-4 text-sm font-medium text-[var(--client-text-secondary)]"
+        >
+          {firstPurchasable
+            ? allOptionsSelected
+              ? "This combination is not offered or is out of stock."
+              : "Select one value for every option to continue."
+            : "This Product is currently out of stock."}
+        </div>
       )}
     </div>
   );

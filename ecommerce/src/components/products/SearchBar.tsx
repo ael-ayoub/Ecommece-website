@@ -36,11 +36,11 @@ export function SearchBar() {
     <form
       role="search"
       onSubmit={handleSubmit}
-      className="rounded-xl border border-stone-200 bg-stone-50 p-3 sm:p-4"
+      className="rounded-2xl border border-[var(--client-border-subtle)] bg-[var(--client-surface-muted)] p-3 shadow-[var(--client-shadow-sm)] sm:p-4"
     >
       <label
         htmlFor="product-search"
-        className="mb-2 block text-sm font-semibold text-stone-800"
+        className="mb-2 block text-sm font-semibold"
       >
         Search the catalog
       </label>
@@ -56,7 +56,7 @@ export function SearchBar() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search by product or category"
-            className="h-12 rounded-lg border-stone-300 bg-white pl-10 pr-11 text-base text-stone-950 placeholder:text-stone-400 focus:border-stone-700 focus:ring-2 focus:ring-stone-700/20"
+            className="h-12 rounded-lg border-[var(--client-border-subtle)] bg-[var(--client-surface)] pl-10 pr-11 text-base text-[var(--client-text-primary)] placeholder:text-stone-400 focus:border-[var(--client-text-primary)] focus:ring-2 focus:ring-stone-700/20"
           />
           {q && (
             <button
@@ -69,10 +69,7 @@ export function SearchBar() {
             </button>
           )}
         </div>
-        <button
-          type="submit"
-          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-stone-900 px-6 text-sm font-semibold text-white transition-colors hover:bg-stone-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-900 focus-visible:ring-offset-2 focus-visible:ring-offset-stone-50 motion-reduce:transition-none"
-        >
+        <button type="submit" className="client-button-primary min-h-12 px-6">
           <Search aria-hidden="true" className="size-4" />
           Search
         </button>

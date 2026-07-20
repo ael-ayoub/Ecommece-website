@@ -6,6 +6,7 @@ import { ArrowRight, Check, ImageIcon, ShoppingBag } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import { useCart } from "@/hooks/useCart";
 import type { ProductDto } from "@/types/product";
+import { getCataloguePresentation } from "@/domain/catalog-presentation";
 
 export function ProductCard({ product }: { product: ProductDto }) {
   const { addItem } = useCart();
@@ -13,19 +14,11 @@ export function ProductCard({ product }: { product: ProductDto }) {
   const [imageFailed, setImageFailed] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
 
-  const activeVariants = product.variants.filter(
-    (v) => v.isActive && v.stockQuantity > 0,
-  );
-  const singleVariant =
-    product.productType === "SIMPLE" && activeVariants.length === 1
-      ? activeVariants[0]
-      : null;
-  const inStock = product.availability === "AVAILABLE";
+  const { singleVariant, hasPriceRange, availabilityLabel, action } =
+    getCataloguePresentation(product);
+  const inStock = action !== "UNAVAILABLE";
   const imageUrl = product.images[0];
   const showImage = Boolean(imageUrl && !imageFailed);
-  const hasPriceRange = product.minPrice !== product.maxPrice;
-  const availabilityLabel =
-    product.availability === "OUT_OF_STOCK" ? "Out of stock" : "Unavailable";
 
   useEffect(() => {
     const image = imageRef.current;
@@ -60,13 +53,13 @@ export function ProductCard({ product }: { product: ProductDto }) {
   }
 
   return (
-    <article className="group flex h-full flex-col overflow-hidden rounded-xl border border-stone-200 bg-white transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-stone-300 hover:shadow-lg hover:shadow-stone-900/5 motion-reduce:transform-none motion-reduce:transition-none">
+    <article className="group flex h-full flex-col overflow-hidden rounded-2xl border border-[var(--client-border-subtle)] bg-[var(--client-surface-elevated)] shadow-[var(--client-shadow-sm)] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-1 hover:border-[var(--client-border-strong)] hover:shadow-[var(--client-shadow-md)] motion-reduce:transform-none motion-reduce:transition-none">
       <Link
         href={`/products/${product.id}`}
         aria-label={`View ${product.name}`}
-        className="relative block overflow-hidden bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-stone-900"
+        className="relative block overflow-hidden bg-[var(--client-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--client-focus-ring)]"
       >
-        <div className="flex aspect-square items-center justify-center text-stone-500">
+        <div className="flex aspect-[4/5] items-center justify-center text-[var(--client-text-secondary)]">
           {showImage ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -91,7 +84,7 @@ export function ProductCard({ product }: { product: ProductDto }) {
           <span
             className={`inline-flex min-h-7 items-center rounded-full px-2.5 text-xs font-semibold shadow-sm ${
               inStock
-                ? "bg-white/95 text-stone-800"
+                ? "bg-white/95 text-[var(--client-success)]"
                 : "bg-stone-900/90 text-white"
             }`}
           >
@@ -101,22 +94,24 @@ export function ProductCard({ product }: { product: ProductDto }) {
       </Link>
 
       <div className="flex flex-1 flex-col p-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--client-text-secondary)]">
           {product.category.name}
         </p>
-        <h3 className="mt-2 text-base font-semibold leading-6 text-stone-950">
+        <h3 className="mt-2 text-base font-semibold leading-6 text-[var(--client-text-primary)]">
           <Link
             href={`/products/${product.id}`}
-            className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-900 focus-visible:ring-offset-2"
+            className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--client-focus-ring)] focus-visible:ring-offset-2"
           >
             {product.name}
           </Link>
         </h3>
-        <p className="mt-2 tabular-nums text-lg font-semibold text-stone-950">
+        <p className="mt-2 tabular-nums text-lg font-semibold text-[var(--client-text-primary)]">
           {hasPriceRange ? (
             <>
               {formatCurrency(product.minPrice)}
-              <span className="mx-1 text-stone-400">–</span>
+              <span className="mx-1 text-[var(--client-text-secondary)]">
+                –
+              </span>
               {formatCurrency(product.maxPrice)}
             </>
           ) : (
@@ -128,14 +123,14 @@ export function ProductCard({ product }: { product: ProductDto }) {
           {!inStock ? (
             <span
               aria-disabled="true"
-              className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-stone-100 px-4 text-sm font-semibold text-stone-500"
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-[var(--client-surface-muted)] px-4 text-sm font-semibold text-[var(--client-text-secondary)]"
             >
               Currently unavailable
             </span>
           ) : singleVariant ? (
             <button
               onClick={handleAddToCart}
-              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-stone-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-stone-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-900 focus-visible:ring-offset-2 motion-reduce:transition-none"
+              className="client-button-primary w-full"
             >
               {added ? (
                 <Check aria-hidden="true" className="size-4" />
@@ -147,7 +142,7 @@ export function ProductCard({ product }: { product: ProductDto }) {
           ) : (
             <Link
               href={`/products/${product.id}`}
-              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-stone-300 px-4 text-sm font-semibold text-stone-900 transition-colors hover:border-stone-500 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-900 focus-visible:ring-offset-2 motion-reduce:transition-none"
+              className="client-button-secondary w-full"
             >
               Choose options
               <ArrowRight aria-hidden="true" className="size-4" />

@@ -16,7 +16,7 @@ import {
   createOrder,
   getOrderForUser,
 } from "../../src/services/order.service";
-import { ConflictError } from "../../src/lib/errors";
+import { ConflictError, NotFoundError } from "../../src/lib/errors";
 
 const enabled = Boolean(process.env.TEST_DATABASE_URL);
 
@@ -180,6 +180,11 @@ test(
     );
 
     const historical = await getOrderForUser(checkout.order.id, user.id);
+    await assert.rejects(
+      () => getOrderForUser(checkout.order.id, user.id + 1_000_000),
+      (error: unknown) => error instanceof NotFoundError,
+      "another client must not be able to retrieve this order",
+    );
     assert.equal(historical.items[0].productNameSnapshot, ordered.name);
     assert.equal(
       historical.items[0].imageSnapshot,

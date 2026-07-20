@@ -1,128 +1,203 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import Link from "next/link";
+import { FormEvent, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { FieldError } from "@/components/ui/field-error";
+import { Eye, EyeOff, LoaderCircle, UserPlus } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
 import type { AuthUser } from "@/types/auth";
 
-interface FieldErrors {
-  name?: string;
-  email?: string;
-  phone?: string;
-  password?: string;
-}
+const inputClass =
+  "mt-2 min-h-12 w-full rounded-xl border border-[var(--client-border-subtle)] bg-[var(--client-surface)] px-3 text-base outline-none focus:border-[var(--client-text-primary)] focus:ring-2 focus:ring-[var(--client-focus-ring)]/20";
 
 export function RegisterForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
-
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
-  const [errors, setErrors] = useState<FieldErrors>({});
-  const [formError, setFormError] = useState<string | null>(null);
+  const locked = useRef(false);
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    password: "",
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  function validate(): boolean {
-    const next: FieldErrors = {};
-    if (!name.trim()) next.name = "Name is required";
-    if (!/^\S+@\S+\.\S+$/.test(email))
-      next.email = "Enter a valid email address";
-    if (phone.trim().length < 6) next.phone = "Enter a valid phone number";
-    if (password.length < 8)
-      next.password = "Password must be at least 8 characters";
-    setErrors(next);
-    return Object.keys(next).length === 0;
-  }
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setFormError(null);
-    if (!validate()) return;
-
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (locked.current) return;
+    setError(null);
+    if (
+      !form.name.trim() ||
+      !/^\S+@\S+\.\S+$/.test(form.email.trim()) ||
+      form.phone.trim().length < 6 ||
+      form.password.length < 8
+    ) {
+      setError(
+        "Check each field. Your password must contain at least 8 characters.",
+      );
+      return;
+    }
+    locked.current = true;
     setSubmitting(true);
     try {
       const data = await apiFetch<{ user: AuthUser }>("/api/auth/register", {
         method: "POST",
-        body: JSON.stringify({ name, email, phone, password }),
+        body: JSON.stringify(form),
       });
       queryClient.setQueryData(["auth", "me"], { user: data.user });
       router.push(data.user.role === "ADMIN" ? "/admin/products" : "/");
       router.refresh();
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Registration failed.");
+    } catch {
+      setError(
+        "We could not create your account. Check your details or try logging in.",
+      );
     } finally {
+      locked.current = false;
       setSubmitting(false);
     }
   }
 
+  const set = (field: keyof typeof form) => (value: string) =>
+    setForm((current) => ({ ...current, [field]: value }));
+
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <h1 className="text-xl font-bold">Create account</h1>
-
-      {formError && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-          {formError}
-        </p>
-      )}
-
-      <div>
-        <label className="mb-1 block text-sm font-medium">Name *</label>
-        <Input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-        />
-        <FieldError message={errors.name} />
-      </div>
-
-      <div>
-        <label className="mb-1 block text-sm font-medium">Email *</label>
-        <Input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-        <FieldError message={errors.email} />
-      </div>
-
-      <div>
-        <label className="mb-1 block text-sm font-medium">Phone *</label>
-        <Input
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          required
-        />
-        <FieldError message={errors.phone} />
-      </div>
-
-      <div>
-        <label className="mb-1 block text-sm font-medium">Password *</label>
-        <Input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
-        <FieldError message={errors.password} />
-      </div>
-
-      <Button type="submit" disabled={submitting}>
-        {submitting ? "Creating account…" : "Register"}
-      </Button>
-
-      <p className="text-center text-sm text-gray-600">
-        Already have an account?{" "}
-        <a href="/login" className="underline">
-          Log in
-        </a>
+    <section className="rounded-2xl border border-[var(--client-border-subtle)] bg-[var(--client-surface-elevated)] p-6 shadow-[var(--client-shadow-md)] sm:p-8">
+      <p className="client-eyebrow">Your account</p>
+      <h1 className="mt-2 text-3xl font-bold tracking-tight">Create account</h1>
+      <p className="mt-3 text-sm leading-6 text-[var(--client-text-secondary)]">
+        Save your contact details and securely access orders placed while signed
+        in.
       </p>
-    </form>
+      <form onSubmit={handleSubmit} noValidate className="mt-7 space-y-4">
+        {error && (
+          <p
+            role="alert"
+            className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+          >
+            {error}
+          </p>
+        )}
+        <Field
+          id="register-name"
+          label="Full name"
+          value={form.name}
+          onChange={set("name")}
+          autoComplete="name"
+        />
+        <Field
+          id="register-email"
+          label="Email"
+          value={form.email}
+          onChange={set("email")}
+          autoComplete="email"
+          type="email"
+        />
+        <Field
+          id="register-phone"
+          label="Phone"
+          value={form.phone}
+          onChange={set("phone")}
+          autoComplete="tel"
+          type="tel"
+        />
+        <div>
+          <label htmlFor="register-password" className="text-sm font-semibold">
+            Password
+          </label>
+          <div className="relative">
+            <input
+              id="register-password"
+              type={showPassword ? "text" : "password"}
+              autoComplete="new-password"
+              value={form.password}
+              onChange={(event) => set("password")(event.target.value)}
+              className={`${inputClass} pr-12`}
+              required
+              minLength={8}
+              aria-describedby="register-password-hint"
+            />
+            <button
+              type="button"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-pressed={showPassword}
+              onClick={() => setShowPassword((value) => !value)}
+              className="client-icon-button absolute right-1 top-1/2 mt-1 -translate-y-1/2"
+            >
+              {showPassword ? (
+                <EyeOff aria-hidden="true" className="size-4" />
+              ) : (
+                <Eye aria-hidden="true" className="size-4" />
+              )}
+            </button>
+          </div>
+          <p
+            id="register-password-hint"
+            className="mt-2 text-xs text-[var(--client-text-secondary)]"
+          >
+            Use at least 8 characters.
+          </p>
+        </div>
+        <button
+          type="submit"
+          disabled={submitting}
+          className="client-button-primary w-full disabled:cursor-wait disabled:opacity-60"
+        >
+          {submitting ? (
+            <LoaderCircle
+              aria-hidden="true"
+              className="size-4 animate-spin motion-reduce:animate-none"
+            />
+          ) : (
+            <UserPlus aria-hidden="true" className="size-4" />
+          )}
+          {submitting ? "Creating account…" : "Create account"}
+        </button>
+      </form>
+      <p className="mt-6 text-center text-sm text-[var(--client-text-secondary)]">
+        Already have an account?{" "}
+        <Link
+          href="/login"
+          className="font-semibold text-[var(--client-text-primary)] underline underline-offset-4"
+        >
+          Log in
+        </Link>
+      </p>
+    </section>
+  );
+}
+
+function Field({
+  id,
+  label,
+  value,
+  onChange,
+  type = "text",
+  autoComplete,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+  autoComplete: string;
+}) {
+  return (
+    <div>
+      <label htmlFor={id} className="text-sm font-semibold">
+        {label}
+      </label>
+      <input
+        id={id}
+        type={type}
+        autoComplete={autoComplete}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className={inputClass}
+        required
+      />
+    </div>
   );
 }

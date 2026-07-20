@@ -1,27 +1,23 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Banknote, ChevronRight, RotateCcw } from "lucide-react";
 import { getProductById } from "@/services/product.service";
 import { VariantSelector } from "@/components/products/VariantSelector";
+import { ProductGallery } from "@/components/products/ProductGallery";
 import { NotFoundError } from "@/lib/errors";
-import { formatCurrency } from "@/lib/format";
-import { ProductImage } from "@/components/products/ProductImage";
 
 interface Props {
   params: { id: string };
 }
 
 export default async function ProductDetailPage({ params }: Props) {
-  const product = await getProductById(Number(params.id)).catch((err) => {
-    if (err instanceof NotFoundError) return null;
-    throw err;
+  const product = await getProductById(Number(params.id)).catch((error) => {
+    if (error instanceof NotFoundError) return null;
+    throw error;
   });
 
-  if (!product) {
-    notFound();
-  }
+  if (!product) notFound();
 
-  const anyInStock = product.variants.some(
-    (v) => v.isActive && v.stockQuantity > 0,
-  );
   const orderedImages =
     product.imageRecords.length > 0
       ? product.imageRecords
@@ -29,83 +25,118 @@ export default async function ProductDetailPage({ params }: Props) {
           id: -1 - position,
           url,
           altText: null,
-          position,
-          isPrimary: position === 0,
         }));
 
   return (
-    <div>
-      <p className="mb-4 text-sm text-gray-500">
-        Home &gt; {product.category.name} &gt; {product.name}
-      </p>
+    <main className="pb-12">
+      <nav aria-label="Breadcrumb" className="mb-7">
+        <ol className="flex flex-wrap items-center gap-1 text-sm text-[var(--client-text-secondary)]">
+          <li>
+            <Link href="/" className="client-text-link min-h-0">
+              Home
+            </Link>
+          </li>
+          <li aria-hidden="true">
+            <ChevronRight className="size-4" />
+          </li>
+          <li>
+            <Link
+              href={`/products?category=${encodeURIComponent(product.category.slug)}`}
+              className="client-text-link min-h-0"
+            >
+              {product.category.name}
+            </Link>
+          </li>
+          <li aria-hidden="true">
+            <ChevronRight className="size-4" />
+          </li>
+          <li
+            aria-current="page"
+            className="font-medium text-[var(--client-text-primary)]"
+          >
+            {product.name}
+          </li>
+        </ol>
+      </nav>
 
-      <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
-        <div>
-          {orderedImages.length > 0 ? (
-            <div className="grid grid-cols-2 gap-3">
-              {orderedImages.map((image, index) => (
-                <div
-                  key={image.id}
-                  className={`flex aspect-square items-center justify-center overflow-hidden rounded-lg bg-gray-100 ${
-                    index === 0 ? "col-span-2" : ""
-                  }`}
-                >
-                  <ProductImage
-                    src={image.url}
-                    alt={image.altText || `${product.name} image ${index + 1}`}
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-              ))}
+      <div className="grid gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(22rem,.95fr)] lg:items-start xl:gap-16">
+        <ProductGallery images={orderedImages} productName={product.name} />
+
+        <section
+          aria-labelledby="product-title"
+          className="lg:sticky lg:top-24"
+        >
+          <p className="client-eyebrow">{product.category.name}</p>
+          <h1
+            id="product-title"
+            className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl"
+          >
+            {product.name}
+          </h1>
+
+          <div className="mt-6 rounded-2xl border border-[var(--client-border-subtle)] bg-[var(--client-surface-elevated)] p-5 shadow-[var(--client-shadow-md)] sm:p-6">
+            {product.variants.length > 0 ? (
+              <VariantSelector
+                productId={product.id}
+                productName={product.name}
+                productImage={product.images[0] ?? null}
+                variants={product.variants}
+                basePrice={product.basePrice.toString()}
+                productType={product.productType}
+                showExactStock={product.showExactStock}
+              />
+            ) : (
+              <div
+                role="status"
+                className="rounded-xl bg-red-50 p-4 text-sm text-red-800"
+              >
+                This Product is currently unavailable.
+              </div>
+            )}
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <div className="flex gap-3 rounded-xl border border-[var(--client-border-subtle)] p-4">
+              <Banknote
+                aria-hidden="true"
+                className="mt-0.5 size-5 shrink-0 text-[var(--client-accent)]"
+              />
+              <div>
+                <h2 className="text-sm font-semibold">Cash on Delivery</h2>
+                <p className="mt-1 text-xs leading-5 text-[var(--client-text-secondary)]">
+                  Pay when you receive your order.
+                </p>
+              </div>
             </div>
-          ) : (
-            <div className="flex aspect-square items-center justify-center rounded-lg bg-gray-100 text-gray-500">
-              <span>Image unavailable</span>
+            <div className="flex gap-3 rounded-xl border border-[var(--client-border-subtle)] p-4">
+              <RotateCcw
+                aria-hidden="true"
+                className="mt-0.5 size-5 shrink-0 text-[var(--client-accent)]"
+              />
+              <div>
+                <h2 className="text-sm font-semibold">Pending orders</h2>
+                <p className="mt-1 text-xs leading-5 text-[var(--client-text-secondary)]">
+                  Account holders can cancel while an order is Pending.
+                </p>
+              </div>
             </div>
-          )}
-        </div>
-
-        <div>
-          <span className="text-xs uppercase tracking-wide text-gray-500">
-            {product.category.name}
-          </span>
-          <h1 className="mb-1 text-2xl font-bold">{product.name}</h1>
-          {product.variants.length === 0 && (
-            <p className="mb-1 text-2xl font-bold">
-              {formatCurrency(product.basePrice.toString())}
-            </p>
-          )}
-          <p className="mb-4 text-sm text-gray-600">
-            {anyInStock ? "In stock" : "Out of stock"}
-          </p>
-
-          {product.variants.length > 0 ? (
-            <VariantSelector
-              productId={product.id}
-              productName={product.name}
-              productImage={product.images[0] ?? null}
-              variants={product.variants}
-              basePrice={product.basePrice.toString()}
-              productType={product.productType}
-              showExactStock={product.showExactStock}
-            />
-          ) : (
-            <p className="text-sm text-red-600">
-              No variants available for this product.
-            </p>
-          )}
-
-          <p className="mt-6 text-sm font-medium">Payment: Cash on Delivery</p>
-          <p className="text-sm text-gray-500">
-            You only pay when you receive your order.
-          </p>
-        </div>
+          </div>
+        </section>
       </div>
 
-      <div className="mt-10 border-t border-gray-200 pt-6">
-        <h2 className="mb-2 font-semibold">Description</h2>
-        <p className="text-gray-700">{product.description}</p>
-      </div>
-    </div>
+      <section
+        aria-labelledby="description-heading"
+        className="mt-14 border-t border-[var(--client-border-subtle)] pt-10"
+      >
+        <p className="client-eyebrow">Product information</p>
+        <h2 id="description-heading" className="mt-2 text-2xl font-semibold">
+          Description
+        </h2>
+        <p className="mt-4 max-w-3xl whitespace-pre-line text-base leading-8 text-[var(--client-text-secondary)]">
+          {product.description ||
+            "No description is available for this Product."}
+        </p>
+      </section>
+    </main>
   );
 }

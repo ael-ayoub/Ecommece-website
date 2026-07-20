@@ -19,7 +19,7 @@ export function CategoryFilter({
   }
 
   const baseClass =
-    "inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-900 focus-visible:ring-offset-2 motion-reduce:transition-none";
+    "inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--client-focus-ring)] focus-visible:ring-offset-2 motion-reduce:transition-none";
 
   return (
     <nav aria-label="Product categories">
@@ -30,8 +30,8 @@ export function CategoryFilter({
           aria-current={!activeSlug ? "page" : undefined}
           className={`${baseClass} ${
             !activeSlug
-              ? "border-stone-900 bg-stone-900 text-white"
-              : "border-stone-300 bg-white text-stone-700 hover:border-stone-500 hover:bg-stone-50"
+              ? "border-[var(--client-text-primary)] bg-[var(--client-text-primary)] text-white"
+              : "border-[var(--client-border-subtle)] bg-[var(--client-surface)] text-[var(--client-text-secondary)] hover:border-[var(--client-border-strong)] hover:bg-[var(--client-surface-muted)]"
           }`}
         >
           All Products
@@ -43,8 +43,8 @@ export function CategoryFilter({
             aria-current={activeSlug === c.slug ? "page" : undefined}
             className={`${baseClass} ${
               activeSlug === c.slug
-                ? "border-stone-900 bg-stone-900 text-white"
-                : "border-stone-300 bg-white text-stone-700 hover:border-stone-500 hover:bg-stone-50"
+                ? "border-[var(--client-text-primary)] bg-[var(--client-text-primary)] text-white"
+                : "border-[var(--client-border-subtle)] bg-[var(--client-surface)] text-[var(--client-text-secondary)] hover:border-[var(--client-border-strong)] hover:bg-[var(--client-surface-muted)]"
             }`}
           >
             {c.name}

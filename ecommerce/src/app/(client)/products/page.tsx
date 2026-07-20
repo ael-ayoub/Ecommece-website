@@ -1,11 +1,12 @@
 import { listProducts } from "@/services/product.service";
 import { listCategories } from "@/services/category.service";
 import Link from "next/link";
-import { ProductCard } from "@/components/products/ProductCard";
 import { CategoryFilter } from "@/components/products/CategoryFilter";
 import { SearchBar } from "@/components/products/SearchBar";
 import { Pagination } from "@/components/common/Pagination";
-import type { ProductDto } from "@/types/product";
+import { ProductGrid } from "@/components/products/ProductGrid";
+import { StorefrontState } from "@/components/storefront/StorefrontState";
+import { PackageSearch } from "lucide-react";
 
 interface Props {
   searchParams: { category?: string; q?: string; page?: string };
@@ -40,20 +41,22 @@ export default async function ProductsPage({ searchParams }: Props) {
   }
 
   return (
-    <main className="pb-12 text-stone-950">
+    <main className="pb-12">
       <header className="mb-8 max-w-2xl">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
-          Shop the collection
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+        <p className="client-eyebrow mb-2">Shop the collection</p>
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-5xl">
           {activeCategory ? activeCategory.name : "All Products"}
         </h1>
-        <p className="mt-3 text-base leading-7 text-stone-600">
+        <p className="mt-3 text-base leading-7 text-[var(--client-text-secondary)]">
           Browse our available products and find the option that fits you.
         </p>
       </header>
 
-      <section aria-label="Product search and filters" className="space-y-5">
+      <section
+        id="catalogue-search"
+        aria-label="Product search and filters"
+        className="space-y-5 scroll-mt-28"
+      >
         <SearchBar />
         <CategoryFilter
           categories={categories}
@@ -62,12 +65,15 @@ export default async function ProductsPage({ searchParams }: Props) {
         />
       </section>
 
-      <div className="mt-8 flex flex-wrap items-end justify-between gap-3 border-b border-stone-200 pb-4">
+      <div className="mt-8 flex flex-wrap items-end justify-between gap-3 border-b border-[var(--client-border-subtle)] pb-4">
         <div>
           <h2 className="text-lg font-semibold">
             {activeCategory?.name ?? "Available products"}
           </h2>
-          <p className="mt-1 text-sm text-stone-500" aria-live="polite">
+          <p
+            className="mt-1 text-sm text-[var(--client-text-secondary)]"
+            aria-live="polite"
+          >
             {total} {total === 1 ? "product" : "products"}
             {searchParams.q ? ` matching “${searchParams.q}”` : ""}
           </p>
@@ -75,7 +81,7 @@ export default async function ProductsPage({ searchParams }: Props) {
         {hasActiveCriteria && (
           <Link
             href="/products"
-            className="inline-flex min-h-11 items-center rounded-md px-3 text-sm font-semibold text-stone-700 underline decoration-stone-300 underline-offset-4 transition-colors hover:text-stone-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-900 focus-visible:ring-offset-2 motion-reduce:transition-none"
+            className="client-text-link text-sm font-semibold"
           >
             Clear all filters
           </Link>
@@ -83,38 +89,25 @@ export default async function ProductsPage({ searchParams }: Props) {
       </div>
 
       {products.length === 0 ? (
-        <section className="mx-auto flex max-w-xl flex-col items-center py-20 text-center">
-          <div
-            aria-hidden="true"
-            className="mb-5 grid size-14 place-items-center rounded-full bg-stone-100 text-2xl font-medium text-stone-500"
-          >
-            0
-          </div>
-          <h2 className="text-xl font-semibold">
-            {hasActiveCriteria
-              ? "No products match your selection"
-              : "No products are available yet"}
-          </h2>
-          <p className="mt-2 max-w-md text-sm leading-6 text-stone-600">
-            {hasActiveCriteria
-              ? "Try a different search or category, or clear the current filters to browse the full catalog."
-              : "Please check back soon. New products will appear here when they become available."}
-          </p>
-          {hasActiveCriteria && (
-            <Link
-              href="/products"
-              className="mt-6 inline-flex min-h-11 items-center justify-center rounded-md bg-stone-900 px-5 text-sm font-semibold text-white transition-colors hover:bg-stone-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-900 focus-visible:ring-offset-2 motion-reduce:transition-none"
-            >
-              View all products
-            </Link>
-          )}
-        </section>
+        <StorefrontState
+          icon={PackageSearch}
+          title={
+            hasActiveCriteria
+              ? "No Products match your selection"
+              : "No Products are available yet"
+          }
+          description={
+            hasActiveCriteria
+              ? "Try a different search or category, or clear the current filters to browse the full catalogue."
+              : "Please check back soon. New Products will appear here when they become available."
+          }
+          actionHref={hasActiveCriteria ? "/products" : undefined}
+          actionLabel={hasActiveCriteria ? "View all Products" : undefined}
+        />
       ) : (
         <>
-          <div className="mt-6 grid grid-cols-1 gap-x-5 gap-y-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {products.map((product: ProductDto) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
+          <div className="mt-6">
+            <ProductGrid products={products} />
           </div>
           <Pagination
             page={page}

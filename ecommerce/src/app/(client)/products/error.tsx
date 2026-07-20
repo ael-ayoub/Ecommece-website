@@ -9,11 +9,9 @@ export default function ProductsError({
   reset: () => void;
 }) {
   return (
-    <main className="pb-12 text-stone-950">
+    <main className="pb-12">
       <header className="mb-8 max-w-2xl">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
-          Shop the collection
-        </p>
+        <p className="client-eyebrow mb-2">Shop the collection</p>
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
           All Products
         </h1>
@@ -21,7 +19,7 @@ export default function ProductsError({
 
       <section
         role="alert"
-        className="rounded-xl border border-red-200 bg-red-50 px-6 py-12 text-center"
+        className="rounded-2xl border border-red-200 bg-red-50 px-6 py-12 text-center"
       >
         <AlertCircle
           aria-hidden="true"
@@ -37,7 +35,7 @@ export default function ProductsError({
         <button
           type="button"
           onClick={reset}
-          className="mx-auto mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-stone-900 px-5 text-sm font-semibold text-white transition-colors hover:bg-stone-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-900 focus-visible:ring-offset-2 focus-visible:ring-offset-red-50 motion-reduce:transition-none"
+          className="client-button-primary mx-auto mt-6"
         >
           <RotateCw aria-hidden="true" className="size-4" />
           Try again
