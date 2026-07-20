@@ -1,14 +1,16 @@
 export function KPICard({
   label,
   value,
+  tone = "neutral",
 }: {
   label: string;
   value: string | number;
+  tone?: "neutral" | "success" | "warning" | "danger";
 }) {
   return (
-    <div className="rounded-lg border border-gray-200 p-4">
-      <p className="text-2xl font-bold">{value}</p>
-      <p className="text-sm text-gray-500">{label}</p>
-    </div>
+    <article className={`admin-kpi admin-kpi-${tone}`}>
+      <p>{label}</p>
+      <strong>{value}</strong>
+    </article>
   );
 }

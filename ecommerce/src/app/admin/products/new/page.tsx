@@ -5,7 +5,16 @@ export default function NewProductPage() {
   const media = getMediaConfig();
   return (
     <div>
-      <h1 className="mb-6 text-xl font-bold">Create Product</h1>
+      <div className="admin-page-heading">
+        <div>
+          <p className="admin-eyebrow">Catalog</p>
+          <h1>Create Product</h1>
+          <p>
+            Define Product information, inventory type, images, and offered
+            SKUs.
+          </p>
+        </div>
+      </div>
       <ProductForm
         mediaLimits={{
           maxFileSizeBytes: media.maxFileSizeBytes,

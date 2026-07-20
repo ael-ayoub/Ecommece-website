@@ -22,9 +22,16 @@ export function RealtimeStatusIndicator() {
   const { status } = useRealtimeOrders();
 
   return (
-    <div className="flex items-center gap-1.5 text-xs text-gray-500">
-      <span className={`h-2 w-2 rounded-full ${STATUS_DOT[status]}`} />
-      {STATUS_TEXT[status]}
+    <div
+      role="status"
+      aria-live="polite"
+      className="flex items-center gap-1.5 text-xs text-gray-500"
+    >
+      <span
+        aria-hidden="true"
+        className={`h-2 w-2 rounded-full ${STATUS_DOT[status]}`}
+      />
+      <span>{STATUS_TEXT[status]}</span>
     </div>
   );
 }

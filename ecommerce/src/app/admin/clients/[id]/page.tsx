@@ -88,7 +88,7 @@ export default function AdminClientDetailPage({ params }: Props) {
   const { client } = data;
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-6xl">
       <Link
         href="/admin/clients"
         className="mb-4 inline-block text-sm underline"
@@ -96,7 +96,7 @@ export default function AdminClientDetailPage({ params }: Props) {
         ← Back to Clients
       </Link>
 
-      <div className="mb-6 rounded border border-gray-200 p-4">
+      <div className="admin-card mb-6">
         {editing ? (
           <div className="space-y-3">
             <label className="block text-sm">
@@ -183,37 +183,39 @@ export default function AdminClientDetailPage({ params }: Props) {
           This client hasn&apos;t placed any orders yet.
         </p>
       ) : (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-left text-gray-500">
-              <th className="py-2">Order</th>
-              <th>Date</th>
-              <th>Status</th>
-              <th>Total</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {client.orders.map((order) => (
-              <tr key={order.id} className="border-b border-gray-100">
-                <td className="py-2">#{order.id}</td>
-                <td>{new Date(order.createdAt).toLocaleDateString()}</td>
-                <td>
-                  <StatusBadge status={order.status} />
-                </td>
-                <td>{formatCurrency(order.totalAmount)}</td>
-                <td className="text-right">
-                  <Link
-                    href={`/admin/orders/${order.id}`}
-                    className="underline"
-                  >
-                    View
-                  </Link>
-                </td>
+        <div className="admin-table-scroll">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 text-left text-gray-500">
+                <th className="py-2">Order</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th>Total</th>
+                <th></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {client.orders.map((order) => (
+                <tr key={order.id} className="border-b border-gray-100">
+                  <td className="py-2">#{order.id}</td>
+                  <td>{new Date(order.createdAt).toLocaleDateString()}</td>
+                  <td>
+                    <StatusBadge status={order.status} />
+                  </td>
+                  <td>{formatCurrency(order.totalAmount)}</td>
+                  <td className="text-right">
+                    <Link
+                      href={`/admin/orders/${order.id}`}
+                      className="underline"
+                    >
+                      View
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

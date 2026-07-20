@@ -15,7 +15,12 @@ import type {
 } from "@/types/analytics";
 
 export default function AdminDashboardPage() {
-  const { data: summary, isLoading: loadingSummary } = useQuery({
+  const {
+    data: summary,
+    isLoading: loadingSummary,
+    isError: summaryError,
+    refetch,
+  } = useQuery({
     queryKey: ["admin", "analytics", "summary"],
     queryFn: () =>
       apiFetch<DashboardSummaryDto>("/api/admin/analytics/summary"),
@@ -38,48 +43,95 @@ export default function AdminDashboardPage() {
   });
 
   return (
-    <div>
-      <h1 className="mb-6 text-xl font-bold">Dashboard</h1>
+    <div className="admin-dashboard">
+      <div className="admin-page-heading">
+        <div>
+          <p className="admin-eyebrow">Overview</p>
+          <h1>Dashboard</h1>
+          <p>Monitor orders, revenue, and operational activity.</p>
+        </div>
+        <Link href="/admin/products/new" className="admin-primary-link">
+          Create Product
+        </Link>
+      </div>
 
       {loadingSummary ? (
-        <p>Loading…</p>
+        <div
+          role="status"
+          aria-label="Loading dashboard"
+          className="admin-kpi-grid"
+        >
+          {[1, 2, 3, 4].map((item) => (
+            <span key={item} className="admin-skeleton h-28" />
+          ))}
+        </div>
+      ) : summaryError ? (
+        <section role="alert" className="admin-alert admin-alert-danger">
+          <strong>Dashboard data is unavailable</strong>
+          <p>Check the connection and try loading the overview again.</p>
+          <button type="button" onClick={() => refetch()}>
+            Try again
+          </button>
+        </section>
       ) : (
         <>
-          <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="admin-kpi-grid">
             <KPICard
               label="Total Revenue"
               value={formatCurrency(summary?.totalRevenue ?? "0")}
             />
-            <KPICard label="Delivered" value={summary?.deliveredCount ?? 0} />
-            <KPICard label="Pending" value={summary?.pendingCount ?? 0} />
-            <KPICard label="Cancelled" value={summary?.cancelledCount ?? 0} />
+            <KPICard
+              label="Delivered"
+              value={summary?.deliveredCount ?? 0}
+              tone="success"
+            />
+            <KPICard
+              label="Pending"
+              value={summary?.pendingCount ?? 0}
+              tone="warning"
+            />
+            <KPICard
+              label="Cancelled"
+              value={summary?.cancelledCount ?? 0}
+              tone="danger"
+            />
           </div>
 
-          <div className="mb-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
-            <div className="rounded-lg border border-gray-200 p-4">
-              <h2 className="mb-3 font-semibold">Revenue Over Time</h2>
+          <div className="admin-chart-grid">
+            <section className="admin-card">
+              <div className="admin-card-heading">
+                <div>
+                  <p className="admin-eyebrow">Performance</p>
+                  <h2>Revenue over time</h2>
+                </div>
+              </div>
               <RevenueChart points={revenueData?.points ?? []} />
-            </div>
-            <div className="rounded-lg border border-gray-200 p-4">
-              <h2 className="mb-3 font-semibold">Orders by Status</h2>
+            </section>
+            <section className="admin-card">
+              <div className="admin-card-heading">
+                <div>
+                  <p className="admin-eyebrow">Operations</p>
+                  <h2>Orders by status</h2>
+                </div>
+              </div>
               {statusData && (
                 <OrdersByStatusChart counts={statusData.ordersByStatus} />
               )}
-            </div>
+            </section>
           </div>
 
-          <div className="rounded-lg border border-gray-200 p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="font-semibold">Recent Activity</h2>
-              <Link
-                href="/admin/orders"
-                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium hover:bg-gray-50"
-              >
-                See all
+          <section className="admin-card">
+            <div className="admin-card-heading">
+              <div>
+                <p className="admin-eyebrow">Latest</p>
+                <h2>Recent activity</h2>
+              </div>
+              <Link href="/admin/orders" className="admin-secondary-link">
+                View all orders
               </Link>
             </div>
             <RecentOrders orders={summary?.recentOrders ?? []} />
-          </div>
+          </section>
         </>
       )}
     </div>

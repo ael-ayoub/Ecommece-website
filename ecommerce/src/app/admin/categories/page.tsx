@@ -80,8 +80,16 @@ export default function AdminCategoriesPage() {
   }
 
   return (
-    <div className="max-w-xl">
-      <h1 className="mb-6 text-xl font-bold">Categories</h1>
+    <div className="max-w-4xl">
+      <div className="admin-page-heading">
+        <div>
+          <p className="admin-eyebrow">Catalog structure</p>
+          <h1>Categories</h1>
+          <p>
+            Organize Products without changing their inventory or lifecycle.
+          </p>
+        </div>
+      </div>
 
       {error && (
         <p
@@ -95,83 +103,89 @@ export default function AdminCategoriesPage() {
       {isLoading ? (
         <p>Loading…</p>
       ) : (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-left text-gray-500">
-              <th className="py-2">Name</th>
-              <th>Products</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.categories.map((c) => (
-              <tr key={c.id} className="border-b border-gray-100">
-                <td className="py-2">
-                  {editingId === c.id ? (
-                    <Input
-                      value={editingName}
-                      onChange={(e) => setEditingName(e.target.value)}
-                      className="w-40"
-                    />
-                  ) : (
-                    c.name
-                  )}
-                </td>
-                <td>{c._count?.products ?? 0}</td>
-                <td className="space-x-3 py-2 text-right">
-                  {editingId === c.id ? (
-                    <>
-                      <button
-                        onClick={() => handleUpdate(c.id)}
-                        className="underline"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={() => setEditingId(null)}
-                        className="underline"
-                      >
-                        Cancel
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => {
-                          setEditingId(c.id);
-                          setEditingName(c.name);
-                        }}
-                        className="underline"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(c)}
-                        className="text-red-600 underline"
-                      >
-                        Delete
-                      </button>
-                    </>
-                  )}
-                </td>
+        <div className="admin-table-scroll">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 text-left text-gray-500">
+                <th scope="col" className="py-2">
+                  Name
+                </th>
+                <th scope="col">Products</th>
+                <th scope="col">
+                  <span className="sr-only">Actions</span>
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {data?.categories.map((c) => (
+                <tr key={c.id} className="border-b border-gray-100">
+                  <td className="py-2">
+                    {editingId === c.id ? (
+                      <Input
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        className="w-40"
+                      />
+                    ) : (
+                      c.name
+                    )}
+                  </td>
+                  <td>{c._count?.products ?? 0}</td>
+                  <td className="space-x-3 py-2 text-right">
+                    {editingId === c.id ? (
+                      <>
+                        <button
+                          onClick={() => handleUpdate(c.id)}
+                          className="underline"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => setEditingId(null)}
+                          className="underline"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => {
+                            setEditingId(c.id);
+                            setEditingName(c.name);
+                          }}
+                          className="underline"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(c)}
+                          className="text-red-600 underline"
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
-      <form onSubmit={handleCreate} className="mt-6 flex items-end gap-2">
-        <div>
+      <form onSubmit={handleCreate} className="admin-create-row">
+        <div className="min-w-0 flex-1">
           <label className="mb-1 block text-xs font-medium">
             New category name
           </label>
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-48"
+            className="w-full"
           />
         </div>
-        <Button type="submit">+ Create Category</Button>
+        <Button type="submit">Create Category</Button>
       </form>
     </div>
   );

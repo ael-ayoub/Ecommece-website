@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api-client";
 import { OrderStatusSelect } from "@/components/admin/orders/OrderStatusSelect";
@@ -41,9 +42,17 @@ export default function AdminOrdersPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-xl font-bold">Orders</h1>
+      <div className="admin-page-heading">
+        <div>
+          <p className="admin-eyebrow">Operations</p>
+          <h1>Orders</h1>
+          <p>
+            Review purchases and move orders through the existing lifecycle.
+          </p>
+        </div>
+      </div>
 
-      <div className="mb-4 flex flex-wrap items-end gap-3 text-sm">
+      <div className="admin-toolbar">
         <div>
           <label className="mb-1 block text-xs font-medium">Status</label>
           <select
@@ -79,55 +88,72 @@ export default function AdminOrdersPage() {
           No orders found. Try adjusting your filters.
         </p>
       ) : (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-left text-gray-500">
-              <th className="py-2">Order</th>
-              <th>Client / Contact</th>
-              <th>
-                <button
-                  onClick={() => toggleSort("date")}
-                  className="hover:underline"
-                >
-                  Date {sortBy === "date" && (sortDir === "asc" ? "▲" : "▼")}
-                </button>
-              </th>
-              <th>
-                <button
-                  onClick={() => toggleSort("price")}
-                  className="hover:underline"
-                >
-                  Total {sortBy === "price" && (sortDir === "asc" ? "▲" : "▼")}
-                </button>
-              </th>
-              <th className="text-right">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.orders.map((order) => (
-              <tr
-                key={order.id}
-                onClick={() => router.push(`/admin/orders/${order.id}`)}
-                className="cursor-pointer border-b border-gray-100 hover:bg-gray-50"
-              >
-                <td className="py-2">#{order.id}</td>
-                <td>
-                  {order.contactName}
-                  <div className="text-xs text-gray-500">
-                    {order.userId
-                      ? order.contactEmail
-                      : `Guest — ${order.contactEmail}`}
-                  </div>
-                </td>
-                <td>{new Date(order.createdAt).toLocaleDateString()}</td>
-                <td>{formatCurrency(order.totalAmount)}</td>
-                <td className="text-right">
-                  <OrderStatusSelect orderId={order.id} status={order.status} />
-                </td>
+        <div className="admin-table-scroll">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 text-left text-gray-500">
+                <th scope="col" className="py-2">
+                  Order
+                </th>
+                <th scope="col">Client / Contact</th>
+                <th scope="col">
+                  <button
+                    onClick={() => toggleSort("date")}
+                    className="hover:underline"
+                  >
+                    Date {sortBy === "date" && (sortDir === "asc" ? "▲" : "▼")}
+                  </button>
+                </th>
+                <th scope="col">
+                  <button
+                    onClick={() => toggleSort("price")}
+                    className="hover:underline"
+                  >
+                    Total{" "}
+                    {sortBy === "price" && (sortDir === "asc" ? "▲" : "▼")}
+                  </button>
+                </th>
+                <th scope="col" className="text-right">
+                  Status
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {data.orders.map((order) => (
+                <tr
+                  key={order.id}
+                  onClick={() => router.push(`/admin/orders/${order.id}`)}
+                  className="cursor-pointer border-b border-gray-100 hover:bg-gray-50"
+                >
+                  <td className="py-2">
+                    <Link
+                      href={`/admin/orders/${order.id}`}
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      #{order.id}
+                    </Link>
+                  </td>
+                  <td>
+                    {order.contactName}
+                    <div className="text-xs text-gray-500">
+                      {order.userId
+                        ? order.contactEmail
+                        : `Guest — ${order.contactEmail}`}
+                    </div>
+                  </td>
+                  <td>{new Date(order.createdAt).toLocaleDateString()}</td>
+                  <td>{formatCurrency(order.totalAmount)}</td>
+                  <td className="text-right">
+                    <OrderStatusSelect
+                      orderId={order.id}
+                      status={order.status}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

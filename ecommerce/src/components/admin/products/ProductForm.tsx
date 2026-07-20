@@ -400,7 +400,7 @@ export function ProductForm({ product, mediaLimits, initialNotice }: Props) {
   return (
     <form onSubmit={handleSubmit} className="flex max-w-5xl flex-col gap-5">
       {formError && (
-        <p className="rounded bg-red-50 p-3 text-sm text-red-700">
+        <p role="alert" className="rounded bg-red-50 p-3 text-sm text-red-700">
           {formError}
         </p>
       )}
@@ -541,6 +541,7 @@ export function ProductForm({ product, mediaLimits, initialNotice }: Props) {
                   <button
                     key={template.id}
                     type="button"
+                    aria-pressed={active}
                     onClick={() =>
                       active
                         ? removeOption(`template-${template.id}`)
@@ -598,6 +599,7 @@ export function ProductForm({ product, mediaLimits, initialNotice }: Props) {
                       <button
                         key={value}
                         type="button"
+                        aria-pressed={option.selectedValues.includes(value)}
                         onClick={() => toggleValue(option.key, value)}
                         className={`rounded border px-2 py-1 text-xs ${option.selectedValues.includes(value) ? "bg-gray-900 text-white" : "bg-white"}`}
                       >

@@ -290,39 +290,44 @@ export function VariantManager({ productId }: { productId: number }) {
             use a clear display label.
           </p>
         )}
-        <div className="mt-3 grid gap-3 md:grid-cols-3">
-          {product.options.map((option) => (
-            <label key={option.id} className="text-sm">
-              {option.name}
-              <select
-                value={selection[option.name] ?? ""}
-                onChange={(event) => {
-                  const next = {
-                    ...selection,
-                    [option.name]: event.target.value,
-                  };
-                  setSelection(next);
-                  const automatic = product.options
-                    .map((item) => next[item.name])
-                    .filter(Boolean)
-                    .join(" / ");
-                  setLabel(automatic);
-                  setSku(
-                    `${product.name}-${automatic}`
-                      .replace(/[^a-z0-9_-]+/gi, "-")
-                      .toUpperCase()
-                      .slice(0, 64),
-                  );
-                }}
-                className="block w-full rounded border px-2 py-2"
-              >
-                <option value="">Select</option>
-                {option.values.map((value) => (
-                  <option key={value.id}>{value.value}</option>
-                ))}
-              </select>
-            </label>
-          ))}
+        <fieldset className="mt-3">
+          <legend className="sr-only">Combination option values</legend>
+          <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(12rem,1fr))]">
+            {product.options.map((option) => (
+              <label key={option.id} className="text-sm">
+                {option.name}
+                <select
+                  value={selection[option.name] ?? ""}
+                  onChange={(event) => {
+                    const next = {
+                      ...selection,
+                      [option.name]: event.target.value,
+                    };
+                    setSelection(next);
+                    const automatic = product.options
+                      .map((item) => next[item.name])
+                      .filter(Boolean)
+                      .join(" / ");
+                    setLabel(automatic);
+                    setSku(
+                      `${product.name}-${automatic}`
+                        .replace(/[^a-z0-9_-]+/gi, "-")
+                        .toUpperCase()
+                        .slice(0, 64),
+                    );
+                  }}
+                  className="block w-full rounded border px-2 py-2"
+                >
+                  <option value="">Select</option>
+                  {option.values.map((value) => (
+                    <option key={value.id}>{value.value}</option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <div className="mt-4 grid gap-3 border-t border-gray-200 pt-4 sm:grid-cols-2 xl:grid-cols-4">
           <label className="text-sm">
             Display label
             <Input
@@ -366,7 +371,11 @@ export function VariantManager({ productId }: { productId: number }) {
           Add combination
         </Button>
       </form>
-      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+      {error && (
+        <p role="alert" className="mt-3 text-sm text-red-600">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

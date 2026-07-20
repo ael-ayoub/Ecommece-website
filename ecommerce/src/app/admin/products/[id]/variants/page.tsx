@@ -7,7 +7,15 @@ interface Props {
 export default function ProductVariantsPage({ params }: Props) {
   return (
     <div>
-      <h1 className="mb-6 text-xl font-bold">Manage Variants</h1>
+      <div className="admin-page-heading">
+        <div>
+          <p className="admin-eyebrow">SKU inventory</p>
+          <h1>Manage Variants</h1>
+          <p>
+            Edit explicit SKU combinations, stock, labels, and price overrides.
+          </p>
+        </div>
+      </div>
       <VariantManager productId={Number(params.id)} />
     </div>
   );

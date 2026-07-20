@@ -78,7 +78,7 @@ export default function AdminOrderDetailPage({ params }: Props) {
   const allowedNext = getAdminOrderTransitions(order.status);
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-6xl">
       <Link
         href="/admin/orders"
         className="mb-4 inline-block text-sm underline"
@@ -91,7 +91,8 @@ export default function AdminOrderDetailPage({ params }: Props) {
         <StatusBadge status={order.status} />
       </div>
 
-      <div className="mb-6 text-sm text-gray-600">
+      <section className="admin-card mb-6 text-sm text-gray-600">
+        <h2 className="mb-3 font-semibold">Order and delivery information</h2>
         <p>Placed: {new Date(order.createdAt).toLocaleString()}</p>
         <p>
           {order.user ? (
@@ -116,17 +117,22 @@ export default function AdminOrderDetailPage({ params }: Props) {
         </p>
         <p>Delivery Address: {order.shippingAddress}</p>
         <p>Payment: Cash on Delivery</p>
-      </div>
+      </section>
 
       <div className="mb-8">
         <OrderStatusTimeline status={order.status} />
       </div>
 
-      <OrderItemsTable
-        items={order.items}
-        total={order.totalAmount}
-        productLinkBase="/admin/products"
-      />
+      <section className="admin-card">
+        <h2 className="mb-4 font-semibold">Purchased items</h2>
+        <div className="admin-table-scroll">
+          <OrderItemsTable
+            items={order.items}
+            total={order.totalAmount}
+            productLinkBase="/admin/products"
+          />
+        </div>
+      </section>
 
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 

@@ -59,6 +59,7 @@ export function OrderStatusSelect({ orderId, status }: Props) {
   return (
     <div className="inline-block text-left">
       <select
+        aria-label={`Status for order ${orderId}`}
         value={status}
         disabled={updating}
         onClick={(e) => e.stopPropagation()}
@@ -72,7 +73,11 @@ export function OrderStatusSelect({ orderId, status }: Props) {
           </option>
         ))}
       </select>
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {error && (
+        <p role="alert" className="mt-1 text-xs text-red-600">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

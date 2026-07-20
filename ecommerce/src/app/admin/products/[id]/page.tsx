@@ -25,7 +25,15 @@ export default async function EditProductPage({ params, searchParams }: Props) {
 
   return (
     <div>
-      <h1 className="mb-6 text-xl font-bold">Edit Product</h1>
+      <div className="admin-page-heading">
+        <div>
+          <p className="admin-eyebrow">Catalog</p>
+          <h1>Edit Product</h1>
+          <p>
+            Update presentation and publishing without changing Product type.
+          </p>
+        </div>
+      </div>
       <ProductForm
         mediaLimits={{
           maxFileSizeBytes: media.maxFileSizeBytes,
